@@ -65,6 +65,7 @@ export async function apiRequest(path: string, init: RequestInit = {}) {
       paternalSurname: url.searchParams.get("paternalSurname") || "",
       maternalSurname: url.searchParams.get("maternalSurname") || "",
       givenNames: url.searchParams.get("givenNames") || "",
+      studentToken: url.searchParams.get("studentToken") || "",
     });
     return response(data, "error" in data ? 400 : 200);
   }
@@ -84,11 +85,50 @@ export async function apiRequest(path: string, init: RequestInit = {}) {
     const data = await jsonp<ApiResult[] | ApiResult>({ action: "results", key });
     return response(data as unknown as ApiResult, Array.isArray(data) ? 200 : 401);
   }
+  if (method === "GET" && url.pathname.endsWith("/api/teacher/students")) {
+    const key = new Headers(init.headers).get("x-teacher-key") || "";
+    const data = await jsonp<ApiResult[] | ApiResult>({ action: "students", key });
+    return response(data as unknown as ApiResult, Array.isArray(data) ? 200 : 401);
+  }
+  if (method === "POST" && url.pathname.endsWith("/api/student/login")) {
+    const requestId = crypto.randomUUID();
+    await send({ action: "studentLogin", requestId, username: String(body.username || ""), password: String(body.password || "") });
+    for (let i = 0; i < 12; i++) {
+      const data = await jsonp<ApiResult>({ action: "loginResult", requestId });
+      if (!data.pending) return response(data, "error" in data ? 401 : 200);
+      await new Promise((resolve) => window.setTimeout(resolve, 250));
+    }
+    return response({ error: "El acceso tardó demasiado. Vuelve a intentarlo." }, 503);
+  }
+  if (method === "POST" && url.pathname.endsWith("/api/teacher/students")) {
+    const key = new Headers(init.headers).get("x-teacher-key") || "";
+    await send({ ...body, action: "saveStudents", key });
+    const data = await jsonp<ApiResult[] | ApiResult>({ action: "students", key });
+    if (!Array.isArray(data)) return response(data as ApiResult, 401);
+    const expected = ((body.students || []) as Array<{ id: string }>).map((s) => s.id);
+    const saved = new Set(data.map((s) => String(s.id)));
+    if (expected.some((id) => !saved.has(id))) return response({ error: "No se pudieron verificar todas las cuentas. Revisa la lista e inténtalo de nuevo." }, 503);
+    return response({ students: data });
+  }
+  if (method === "POST" && url.pathname.endsWith("/api/teacher/student-password")) {
+    const key = new Headers(init.headers).get("x-teacher-key") || "";
+    const before = await jsonp<ApiResult[] | ApiResult>({ action: "students", key });
+    if (!Array.isArray(before)) return response(before as ApiResult, 401);
+    const studentId = String(body.studentId || "");
+    const previous = before.find((s) => String(s.id) === studentId);
+    if (!previous) return response({ error: "No se encontró la cuenta del alumno." }, 404);
+    await send({ ...body, action: "resetStudentPassword", key });
+    const data = await jsonp<ApiResult[] | ApiResult>({ action: "students", key });
+    if (!Array.isArray(data)) return response(data as ApiResult, 401);
+    const updated = data.find((s) => String(s.id) === studentId);
+    if (!updated || updated.password_version === previous.password_version) return response({ error: "No se pudo verificar el cambio de contraseña. Comprueba la clave del maestro e inténtalo otra vez." }, 503);
+    return response({ students: data });
+  }
   if (method === "POST" && url.pathname.endsWith("/api/submit")) {
     const id = String(body.activityId || "digestivo-inicial");
     const activity = cachedActivities.get(id) || cachedActivity;
     if (!activity) return response({ error: "No se encontró la actividad." }, 404);
-    const availability = await jsonp<ApiResult>({ action: "attempts", activityId: id, paternalSurname: String(body.paternalSurname || ""), maternalSurname: String(body.maternalSurname || ""), givenNames: String(body.givenNames || "") });
+    const availability = await jsonp<ApiResult>({ action: "attempts", activityId: id, paternalSurname: String(body.paternalSurname || ""), maternalSurname: String(body.maternalSurname || ""), givenNames: String(body.givenNames || ""), studentToken: String(body.studentToken || "") });
     if ("error" in availability) return response(availability, 400);
     if (!availability.canStart) return response({ error: "Ya utilizaste todos tus intentos para esta actividad." }, 429);
     const placements = (body.placements || {}) as Record<string, string>;
@@ -103,7 +143,7 @@ export async function apiRequest(path: string, init: RequestInit = {}) {
       timedOut: Boolean(body.timedOut),
     };
     await send({ action: "submit", ...body });
-    const after = await jsonp<ApiResult>({ action: "attempts", activityId: id, paternalSurname: String(body.paternalSurname || ""), maternalSurname: String(body.maternalSurname || ""), givenNames: String(body.givenNames || "") });
+    const after = await jsonp<ApiResult>({ action: "attempts", activityId: id, paternalSurname: String(body.paternalSurname || ""), maternalSurname: String(body.maternalSurname || ""), givenNames: String(body.givenNames || ""), studentToken: String(body.studentToken || "") });
     if ("error" in after) return response(after, 400);
     if (Number(after.used) <= Number(availability.used)) return response({ error: "No se pudo registrar el intento. Vuelve a intentarlo." }, 503);
     return response({ ...result, attemptsUsed: Number(after.used), attemptsRemaining: after.remaining as number | null, maxAttempts: after.maxAttempts as number | null });
