@@ -138,8 +138,16 @@ export async function apiRequest(path: string, init: RequestInit = {}) {
     if (!availability.canStart) return response({ error: "Ya utilizaste todos tus intentos para esta actividad." }, 429);
     const placements = (body.placements || {}) as Record<string, string>;
     const matches = (body.matches || {}) as Record<string, string>;
-    const correct = activity.kind === "pairs" ? (activity.pairs || []).filter((pair) => matches[pair.id] === pair.id).length : activity.labels.filter((label) => placements[label.id] === label.id).length;
-    const total = activity.kind === "pairs" ? (activity.pairs || []).length : activity.labels.length;
+    const answers = (body.answers || {}) as Record<string, unknown>;
+    let correct = 0;
+    if (activity.kind === "quiz") correct = (activity.questions || []).filter((question) => answers[question.id] === question.correctOptionId).length;
+    else if (activity.kind === "group-sort") correct = (activity.items || []).filter((item) => answers[item.id] === item.groupId).length;
+    else if (activity.kind === "sequence") {
+      const submitted = Array.isArray(answers.order) ? answers.order.map(String) : [];
+      correct = [...(activity.steps || [])].sort((a, b) => a.order - b.order).filter((step, index) => submitted[index] === step.id).length;
+    } else if (activity.kind === "pairs") correct = (activity.pairs || []).filter((pair) => matches[pair.id] === pair.id).length;
+    else correct = activity.labels.filter((label) => placements[label.id] === label.id).length;
+    const total = activity.kind === "pairs" ? (activity.pairs || []).length : activity.kind === "quiz" ? (activity.questions || []).length : activity.kind === "group-sort" ? (activity.items || []).length : activity.kind === "sequence" ? (activity.steps || []).length : activity.labels.length;
     const elapsedSeconds = Number(body.elapsedSeconds) || 0;
     const result = {
       id: Date.now(), correct, total,
