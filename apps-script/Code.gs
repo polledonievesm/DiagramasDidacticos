@@ -88,7 +88,7 @@ function saveActivity_(body) {
   const title = String(body.title || '').trim().slice(0, 120);
   if (!title) throw new Error('Escribe el título de la actividad.');
   if (body.kind === 'pairs') return savePairActivity_(body, id, title);
-  if (['quiz', 'group-sort', 'sequence'].includes(body.kind)) return saveTemplateActivity_(body, id, title);
+  if (['quiz', 'group-sort', 'sequence', 'complete-sentence', 'word-order'].includes(body.kind)) return saveTemplateActivity_(body, id, title);
   if (!Array.isArray(body.labels) || body.labels.length < 1 || body.labels.length > 10) throw new Error('La actividad requiere de 1 a 10 etiquetas.');
 
   const sheet = spreadsheet_().getSheetByName(TAB_ACTIVITIES);
@@ -183,6 +183,25 @@ function saveTemplateActivity_(body, id, title) {
       const groupId = String(item.groupId || '');
       if (!text || !groupIds[groupId]) throw new Error('Cada elemento necesita texto y un grupo correcto.');
       return { id: itemId, text: text, imageUrl: image_(item, itemId), groupId: groupId };
+    });
+  } else if (kind === 'complete-sentence') {
+    if (!Array.isArray(body.sentences) || body.sentences.length < 1 || body.sentences.length > 50) throw new Error('Agrega entre 1 y 50 oraciones.');
+    content.sentences = body.sentences.map(function(sentence, i) {
+      const sentenceId = unique_(sentence.id, 'oracion-' + (i + 1));
+      const before = String(sentence.before || '').trim().slice(0, 500);
+      const answer = String(sentence.answer || '').trim().slice(0, 120);
+      const after = String(sentence.after || '').trim().slice(0, 500);
+      if (!before || !answer) throw new Error('Cada oración requiere texto y una respuesta correcta.');
+      return { id: sentenceId, before: before, answer: answer, after: after, imageUrl: image_(sentence, sentenceId) };
+    });
+  } else if (kind === 'word-order') {
+    if (!Array.isArray(body.wordSentences) || body.wordSentences.length < 1 || body.wordSentences.length > 30) throw new Error('Agrega entre 1 y 30 oraciones.');
+    content.wordSentences = body.wordSentences.map(function(sentence, i) {
+      const sentenceId = unique_(sentence.id, 'oracion-' + (i + 1));
+      const text = String(sentence.text || '').trim().slice(0, 500);
+      const words = text.split(/\\s+/).filter(Boolean);
+      if (words.length < 2 || words.length > 50) throw new Error('Cada oración debe contener entre 2 y 50 palabras.');
+      return { id: sentenceId, text: text, words: words.map(function(word, index) { return { id: sentenceId + '-palabra-' + index, text: word, order: index }; }) };
     });
   } else if (kind === 'flashcards' || kind === 'memory') {
     if (!Array.isArray(body.pairs) || body.pairs.length < 2 || body.pairs.length > 30) throw new Error('Agrega entre 2 y 30 tarjetas.');
@@ -292,6 +311,19 @@ function saveResult_(body) {
     const correctSteps = (activity.steps || []).slice().sort(function(a, b) { return Number(a.order) - Number(b.order); });
     correctSteps.forEach(function(step, index) { if (submittedOrder[index] === step.id) correct++; });
     safe.order = submittedOrder.filter(function(stepId) { return correctSteps.some(function(step) { return step.id === stepId; }); });
+  } else if (activity.kind === 'complete-sentence') {
+    (activity.sentences || []).forEach(function(sentence) {
+      const submitted = String(answers[sentence.id] || '').slice(0, 120);
+      safe[sentence.id] = submitted;
+      if (normalizeStudent_(submitted) === normalizeStudent_(sentence.answer)) correct++;
+    });
+  } else if (activity.kind === 'word-order') {
+    (activity.wordSentences || []).forEach(function(sentence) {
+      const submitted = String(answers[sentence.id] || '').split('|');
+      const expected = (sentence.words || []).slice().sort(function(a, b) { return Number(a.order) - Number(b.order); });
+      expected.forEach(function(word, index) { if (submitted[index] === word.id) correct++; });
+      safe[sentence.id] = submitted.filter(function(wordId) { return expected.some(function(word) { return word.id === wordId; }); });
+    });
   } else if (activity.kind === 'flashcards' || activity.kind === 'memory') {
     (activity.pairs || []).forEach(function(pair) {
       const selected = String(answers[pair.id] || '');
@@ -308,7 +340,7 @@ function saveResult_(body) {
     if (activity.labels.some(function(other) { return other.id === target; })) safe[label.id] = target;
     if (target === label.id) correct++;
   });
-  const total = activity.kind === 'pairs' || activity.kind === 'flashcards' || activity.kind === 'memory' ? (activity.pairs || []).length : activity.kind === 'quiz' ? (activity.questions || []).length : activity.kind === 'group-sort' ? (activity.items || []).length : activity.kind === 'sequence' ? (activity.steps || []).length : activity.labels.length;
+  const total = activity.kind === 'pairs' || activity.kind === 'flashcards' || activity.kind === 'memory' ? (activity.pairs || []).length : activity.kind === 'quiz' ? (activity.questions || []).length : activity.kind === 'group-sort' ? (activity.items || []).length : activity.kind === 'sequence' ? (activity.steps || []).length : activity.kind === 'complete-sentence' ? (activity.sentences || []).length : activity.kind === 'word-order' ? (activity.wordSentences || []).reduce(function(sum, sentence) { return sum + (sentence.words || []).length; }, 0) : activity.labels.length;
   const grade = Math.round((correct / Math.max(total, 1)) * 100) / 10;
   const elapsed = clamp_(body.elapsedSeconds || 0, 0, 86400);
   const remaining = body.remainingSeconds === null || body.remainingSeconds === undefined ? '' : clamp_(body.remainingSeconds, 0, 86400);
