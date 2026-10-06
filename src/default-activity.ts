@@ -6,7 +6,9 @@ export type QuizQuestion = { id: string; prompt: string; imageUrl?: string | nul
 export type SortGroup = { id: string; title: string; color: string };
 export type SortItem = { id: string; text: string; imageUrl?: string | null; imageData?: string | null; groupId: string };
 export type SequenceStep = { id: string; text: string; imageUrl?: string | null; imageData?: string | null; order: number };
-export type ActivityKind = "diagram" | "pairs" | "quiz" | "group-sort" | "sequence" | "flashcards" | "memory";
+export type FillSentence = { id: string; before: string; answer: string; after: string; imageUrl?: string | null; imageData?: string | null };
+export type WordOrderSentence = { id: string; text: string; words?: Array<{ id: string; text: string; order: number }> };
+export type ActivityKind = "diagram" | "pairs" | "quiz" | "group-sort" | "sequence" | "flashcards" | "memory" | "complete-sentence" | "word-order";
 export type Activity = {
   kind?: ActivityKind;
   pairs?: MatchingPair[];
@@ -14,6 +16,8 @@ export type Activity = {
   groups?: SortGroup[];
   items?: SortItem[];
   steps?: SequenceStep[];
+  sentences?: FillSentence[];
+  wordSentences?: WordOrderSentence[];
   shuffle?: boolean;
   sound?: boolean;
   scoring?: boolean;
