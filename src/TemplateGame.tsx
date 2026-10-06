@@ -85,7 +85,7 @@ export default function TemplateGame({kind}:Props){
 
  async function teacherEnter(event:React.FormEvent){
   event.preventDefault();setBusy(true);setNotice("");
-  try{await getTeacherActivities(keyDraft);setTeacherKey(keyDraft);sessionStorage.setItem("platformTeacherKey",keyDraft);sessionStorage.setItem("diagramTeacherKey",keyDraft);sessionStorage.setItem("pairTeacherKey",keyDraft);setScreen("teacher")}
+  try{await getTeacherActivities(keyDraft);setTeacherKey(keyDraft);sessionStorage.setItem("platformTeacherKey",keyDraft);sessionStorage.setItem("diagramTeacherKey",keyDraft);sessionStorage.setItem("pairTeacherKey",keyDraft);const q=new URLSearchParams(location.search);if(q.get("actividad"))await loadSaved(q.get("actividad")!);else if(q.get("nueva")==="1"){const fresh=blank(kind);setActivity(fresh);setDraft(fresh)}setScreen("teacher")}
   catch(e){setNotice(e instanceof Error?e.message:"No se pudo validar la clave.")}
   finally{setBusy(false)}
  }
@@ -102,15 +102,15 @@ export default function TemplateGame({kind}:Props){
   }catch(e){setNotice(e instanceof Error?e.message:"No se pudo guardar la actividad.")}
   finally{setBusy(false)}
  }
- async function start(){
-  if(!activity.id||!student||!studentToken)return;
+ async function start(profile:Student|null=student,token=studentToken){
+  if(!activity.id||!profile||!token)return;
   setBusy(true);setNotice("");
   try{
-   const query=new URLSearchParams({activityId:activity.id,studentToken,paternalSurname:student.paternalSurname,maternalSurname:student.maternalSurname,givenNames:student.givenNames});
+   const query=new URLSearchParams({activityId:activity.id,studentToken:token,paternalSurname:profile.paternalSurname,maternalSurname:profile.maternalSurname,givenNames:profile.givenNames});
    const response=await apiRequest("/api/attempts?"+query),data=await response.json();
    if(!response.ok||!data.canStart)throw Error(data.error||"Ya no tienes intentos.");
    setAttempts(data.remaining===null?null:Number(data.remaining));setRemaining(activity.timerMode==="down"?activity.timeLimitSeconds:null);setSeconds(0);setTimedOut(false);setAnswers({});
-   if(kind==="quiz")setPlayQuestions(activity.shuffle===false?[...(activity.questions||[])]:randomize(activity.questions||[]));
+   if(kind==="quiz")setPlayQuestions((activity.shuffle===false?[...(activity.questions||[])]:randomize(activity.questions||[])).map(q=>({...q,options:activity.shuffle===false?[...q.options]:randomize(q.options)})));
    if(kind==="group-sort")setPlayItems(activity.shuffle===false?[...(activity.items||[])]:randomize(activity.items||[]));
    if(kind==="sequence")setOrder(activity.shuffle===false?[...(activity.steps||[])]:randomize(activity.steps||[]));
    setScreen("play");
@@ -123,7 +123,7 @@ export default function TemplateGame({kind}:Props){
    const response=await apiRequest("/api/student/login",{method:"POST",body:JSON.stringify(credentials)}),data=await response.json();
    if(!response.ok)throw Error(data.error||"Usuario o contraseña incorrectos.");
    setStudent(data.student);setStudentToken(data.token);setCredentials({username:"",password:""});setBusy(false);
-   await new Promise(resolve=>setTimeout(resolve,0));await start();
+   await start(data.student,data.token);
   }catch(e){setNotice(e instanceof Error?e.message:"No se pudo iniciar sesión.");setBusy(false)}
  }
  async function finish(expired=false){
@@ -168,7 +168,7 @@ export default function TemplateGame({kind}:Props){
  if(screen==="login")return <main className="tg-page"><header className="tg-header"><a href="./">Aula en juego</a></header><form className="tg-login" onSubmit={studentLogin}><span className="tg-kicker">{title.toUpperCase()}</span><h1>{activity.title||title}</h1><p>Ingresa con tu cuenta de alumno para comenzar.</p><label>Usuario<input required autoComplete="username" value={credentials.username} onChange={e=>setCredentials({...credentials,username:e.target.value})}/></label><label>Contraseña<input required type="password" autoComplete="current-password" value={credentials.password} onChange={e=>setCredentials({...credentials,password:e.target.value})}/></label>{notice&&<p className="tg-notice">{notice}</p>}<button className="tg-primary" disabled={busy}>{busy?"Validando…":"Entrar y comenzar"}</button></form></main>;
 
  if(screen==="play")return <main className="tg-page"><header className="tg-play-head"><a href="./">Aula en juego</a><span>{activity.timerMode==="none"?"Sin límite":timerText}</span><small>{attempts===null?"Intentos ilimitados":"Intentos restantes: "+attempts}</small></header><section className="tg-play-shell"><span className="tg-kicker">{title.toUpperCase()}</span><h1>{activity.title}</h1><p>{activity.instructions}</p>
- {kind==="quiz"&&<div className="tg-play-questions">{playQuestions.map((q,index)=><article className="tg-question-card" key={q.id}><h2>{index+1}. {q.prompt}</h2>{(q.imageUrl||q.imageData)&&<img className="tg-question-image" src={q.imageData||q.imageUrl||""} alt="Imagen de la pregunta"/>}<div className="tg-answer-grid">{(activity.shuffle===false?q.options:randomize(q.options)).map(option=><button key={option.id} className={answers[q.id]===option.id?"chosen":""} onClick={()=>setAnswers({...answers,[q.id]:option.id})}>{option.text}</button>)}</div></article>)}</div>}
+ {kind==="quiz"&&<div className="tg-play-questions">{playQuestions.map((q,index)=><article className="tg-question-card" key={q.id}><h2>{index+1}. {q.prompt}</h2>{(q.imageUrl||q.imageData)&&<img className="tg-question-image" src={q.imageData||q.imageUrl||""} alt="Imagen de la pregunta"/>}<div className="tg-answer-grid">{q.options.map(option=><button key={option.id} className={answers[q.id]===option.id?"chosen":""} onClick={()=>setAnswers({...answers,[q.id]:option.id})}>{option.text}</button>)}</div></article>)}</div>}
  {kind==="group-sort"&&<div className="tg-sort-game"><div className="tg-groups">{(activity.groups||[]).map(group=><section key={group.id} style={{borderTopColor:group.color}}><h2>{group.title}</h2><div>{playItems.filter(item=>answers[item.id]===group.id).map(item=><span key={item.id}>{item.text}</span>)}</div></section>)}</div><div className="tg-sort-items"><h2>Elige un elemento y después su grupo</h2>{playItems.map(item=>{const chosen=answers[item.id];return <article key={item.id} className={chosen?"sorted":""}>{(item.imageUrl||item.imageData)&&<img src={item.imageData||item.imageUrl||""} alt=""/>}<strong>{item.text}</strong><div>{(activity.groups||[]).map(group=><button key={group.id} className={chosen===group.id?"chosen":""} onClick={()=>setAnswers({...answers,[item.id]:group.id})}>{group.title}</button>)}</div></article>})}</div></div>}
  {kind==="sequence"&&<div className="tg-sequence">{order.map((step,index)=><article key={step.id}><span>{index+1}</span>{(step.imageUrl||step.imageData)&&<img src={step.imageData||step.imageUrl||""} alt=""/>}<strong>{step.text}</strong><div><button aria-label="Subir paso" disabled={index===0} onClick={()=>moveStep(index,-1)}>↑</button><button aria-label="Bajar paso" disabled={index===order.length-1} onClick={()=>moveStep(index,1)}>↓</button></div></article>)}</div>}
  {notice&&<p className="tg-notice">{notice}</p>}<button className="tg-primary tg-finish" disabled={busy} onClick={()=>void finish()}>{busy?"Guardando…":"Terminar y calificar"}</button></section></main>;
