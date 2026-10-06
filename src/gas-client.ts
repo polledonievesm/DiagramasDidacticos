@@ -49,6 +49,10 @@ export async function apiRequest(path: string, init: RequestInit = {}) {
   const method = (init.method || "GET").toUpperCase();
   const body = typeof init.body === "string" ? JSON.parse(init.body) as Record<string, unknown> : {};
 
+  if (method === "GET" && url.pathname.endsWith("/api/capabilities")) {
+    const data = await jsonp<ApiResult>({ action: "capabilities" });
+    return response(data, typeof data.apiVersion === "number" ? 200 : 404);
+  }
   if (method === "GET" && url.pathname.endsWith("/api/activity")) {
     const data = await jsonp<Activity>({ action: "activity", id: url.searchParams.get("id") || "" });
     if (data && !("error" in (data as object))) {
