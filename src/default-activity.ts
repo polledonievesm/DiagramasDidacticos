@@ -33,6 +33,7 @@ export type Activity = {
   timerMode: "none" | "up" | "down";
   timeLimitSeconds: number;
   maxAttempts: number | null;
+  availableUntil?: string | null;
   imageUrl: string;
   imageKey?: string | null;
   labels: DigestiveLabel[];
