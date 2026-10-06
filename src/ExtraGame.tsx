@@ -49,7 +49,7 @@ export default function ExtraGame({kind}:{kind:Kind}){
  const [current,C]=useState<WheelEntry|null>(null),[completed,Done]=useState<string[]>([]),[grid,G]=useState<Cell[][]>([]),[found,F]=useState<string[]>([]),[selected,Sel]=useState<{row:number;col:number}|null>(null);
  const [rotation,Rot]=useState(0),[gridVersion,GV]=useState(0);
  const [dragPath,DragPath]=useState<Array<{row:number;col:number}>>([]);
- const dragOrigin=useRef<Cell|null>(null),priorSelected=useRef<Cell|null>(null),dragging=useRef(false),skipClick=useRef(false);
+ const dragOrigin=useRef<Cell|null>(null),priorSelected=useRef<{row:number;col:number}|null>(null),dragging=useRef(false),skipClick=useRef(false);
  const entries=draft.wheelEntries||[];
  const wordList=kind==="complete-phrase"?(activity.sentences||[]).map(sentence=>sentence.answer):activity.wordSearchWords||[];
  const gridSize=Math.min(15,Math.max(10,Number(kind==="complete-phrase"?activity.phraseGridSize:activity.wordSearchGridSize)||10));
