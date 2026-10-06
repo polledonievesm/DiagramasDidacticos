@@ -1,5 +1,9 @@
 export type DigestiveLabel = { id: string; text: string; color: string; x: number; y: number };
+export type PairSide = { text: string; imageUrl?: string | null; imageData?: string | null };
+export type MatchingPair = { id: string; left: PairSide; right: PairSide };
 export type Activity = {
+  kind?: "diagram" | "pairs";
+  pairs?: MatchingPair[];
   id: string;
   title: string;
   instructions: string;
