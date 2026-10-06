@@ -55,7 +55,7 @@ export type CommonActivity = {
   content: ActivityContent;
 };
 
-const relationTemplates = new Set<TemplateId>(["pairs", "memory", "flashcards", "quiz"]);
+const relationTemplates = new Set<TemplateId>(["pairs", "memory", "flashcards"]);
 
 /** Adapts saved diagram and pair records without changing their IDs or student history. */
 export function fromLegacyActivity(activity: LegacyActivity): CommonActivity {
@@ -93,5 +93,5 @@ export function convertRelationTemplate(activity: CommonActivity, target: Templa
 }
 
 export function isTemplateImplemented(id: TemplateId): boolean {
-  return id === "diagram-labels" || id === "pairs";
+  return ["diagram-labels", "pairs", "quiz", "group-sort", "sequence", "complete-sentence", "word-order", "flashcards", "memory", "roulette", "word-search"].includes(id);
 }
