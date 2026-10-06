@@ -114,8 +114,9 @@ export async function apiRequest(path: string, init: RequestInit = {}) {
     const data = await jsonp<Activity[] | ApiResult>({ action: "activities", key });
     if (!Array.isArray(data)) return response(data as ApiResult, 401);
     data.forEach((item) => cachedActivities.set(item.id, item));
-    const pairsOnly = url.searchParams.get("tipo") === "pairs";
-    return response((pairsOnly ? data.filter((item) => item.kind === "pairs") : data.filter((item) => item.kind !== "pairs")) as unknown as ApiResult);
+    const type = url.searchParams.get("tipo");
+    const filtered = type === "all" ? data : type === "pairs" ? data.filter((item) => item.kind === "pairs") : data.filter((item) => item.kind !== "pairs");
+    return response(filtered as unknown as ApiResult);
   }
   if (method === "GET" && url.pathname.endsWith("/api/teacher/results")) {
     const key = new Headers(init.headers).get("x-teacher-key") || "";
