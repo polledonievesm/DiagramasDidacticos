@@ -9,7 +9,7 @@ export type SequenceStep = { id: string; text: string; imageUrl?: string | null;
 export type FillSentence = { id: string; before: string; answer: string; after: string; imageUrl?: string | null; imageData?: string | null };
 export type WordOrderSentence = { id: string; text: string; words?: Array<{ id: string; text: string; order: number }> };
 export type WheelEntry = { id: string; text: string; imageUrl?: string | null; imageData?: string | null };
-export type ActivityKind = "diagram" | "pairs" | "quiz" | "group-sort" | "sequence" | "flashcards" | "memory" | "complete-sentence" | "word-order" | "roulette" | "word-search";
+export type ActivityKind = "diagram" | "pairs" | "quiz" | "quiz-show" | "true-false" | "group-sort" | "sequence" | "flashcards" | "memory" | "complete-sentence" | "complete-phrase" | "word-order" | "roulette" | "word-search";
 export type Activity = {
   kind?: ActivityKind;
   pairs?: MatchingPair[];
@@ -22,6 +22,7 @@ export type Activity = {
   wheelEntries?: WheelEntry[];
   wordSearchWords?: string[];
   wordSearchGridSize?: number;
+  phraseGridSize?: number;
   wordSearchDirections?: string[];
   shuffle?: boolean;
   sound?: boolean;
