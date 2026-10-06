@@ -115,7 +115,7 @@ export default function ActivityManager() {
   const planned = templateRegistry.filter(template => template.status !== "ready");
 
   return <main className="activity-manager-page">
-    <header className="am-header"><a href="./"><span className="am-logo">A</span>Aula en juego</a><nav><span>Panel del maestro</span><button onClick={()=>{sessionStorage.removeItem("platformTeacherKey");setKey("");setReady(false);setDraftKey("");}}>Salir</button></nav></header>
+    <header className="am-header"><a href="./"><span className="am-logo">A</span>Aula en juego</a><nav><span>Panel del maestro</span><button onClick={()=>{sessionStorage.removeItem("platformTeacherKey");sessionStorage.removeItem("pairTeacherKey");sessionStorage.removeItem("diagramTeacherKey");setKey("");setReady(false);setDraftKey("");}}>Salir</button></nav></header>
     <section className="am-main">
       <div className="am-heading"><div><span className="am-kicker">TU ESPACIO DE TRABAJO</span><h1>Mis actividades</h1><p>Crea, organiza y comparte actividades para tu grupo.</p></div><button className="am-refresh" onClick={()=>void refresh()} disabled={busy}>Actualizar lista</button></div>
       {notice&&<p className="am-notice" role="status">{notice}</p>}
