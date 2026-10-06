@@ -3,10 +3,15 @@ import { createRoot } from "react-dom/client";
 import App from "./App";
 import PairGame from "./PairGame";
 import ActivityManager from "./ActivityManager";
+import TemplateGame from "./TemplateGame";
 import "./globals.css";
+
+const query=new URLSearchParams(window.location.search);
+const game=query.get("juego")||"";
+const generic=["quiz","group-sort","sequence"].includes(game);
 
 createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    {new URLSearchParams(window.location.search).get("panel") === "actividades" ? <ActivityManager /> : new URLSearchParams(window.location.search).get("juego") === "parejas" ? <PairGame /> : <App />}
+    {query.get("panel")==="actividades" ? <ActivityManager /> : game==="parejas" ? <PairGame /> : generic ? <TemplateGame kind={game as "quiz"|"group-sort"|"sequence"} /> : <App />}
   </React.StrictMode>,
 );
