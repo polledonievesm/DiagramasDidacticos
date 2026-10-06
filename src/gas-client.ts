@@ -3,6 +3,29 @@ import type { Activity } from "./default-activity";
 type ApiResult = Record<string, unknown>;
 let cachedActivities = new Map<string, Activity>();
 let cachedActivity: Activity | null = null;
+const teacherKeyNames = ["platformTeacherKey", "pairTeacherKey", "diagramTeacherKey"] as const;
+
+export function getTeacherKey() {
+  for (const name of teacherKeyNames) {
+    const value = localStorage.getItem(name) || sessionStorage.getItem(name);
+    if (value) return value;
+  }
+  return "";
+}
+
+export function rememberTeacherKey(value: string) {
+  teacherKeyNames.forEach(name => {
+    localStorage.setItem(name, value);
+    sessionStorage.setItem(name, value);
+  });
+}
+
+export function forgetTeacherKey() {
+  teacherKeyNames.forEach(name => {
+    localStorage.removeItem(name);
+    sessionStorage.removeItem(name);
+  });
+}
 
 function endpoint() {
   const value = window.GAS_WEB_APP_URL?.trim();
