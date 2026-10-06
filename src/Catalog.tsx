@@ -1,24 +1,68 @@
 import { useEffect, useMemo, useState } from "react";
-import { defaultActivity } from "./default-activity";
 import { templateRegistry } from "./template-registry";
 import { apiRequest } from "./gas-client";
 
 export default function Catalog() {
-  const [search,setSearch]=useState("");
-  const [supportedKinds,setSupportedKinds]=useState<string[]>(["diagram","pairs"]);
-  useEffect(()=>{let live=true;void apiRequest("/api/capabilities").then(async response=>{const data=await response.json();if(live&&response.ok&&Array.isArray(data.kinds))setSupportedKinds(data.kinds)}).catch(()=>{});return()=>{live=false}},[]);
-  const matches=useMemo(()=>templateRegistry.filter(g=>(g.title+" "+g.kind+" "+g.description).toLocaleLowerCase("es-MX").includes(search.trim().toLocaleLowerCase("es-MX"))),[search]);
+  const [search, setSearch] = useState("");
+  const [supportedKinds, setSupportedKinds] = useState<string[]>(["diagram", "pairs"]);
+  const [teacher, setTeacher] = useState(false);
+  const [accountOpen, setAccountOpen] = useState(false);
+
+  useEffect(() => {
+    setTeacher(Boolean(sessionStorage.getItem("platformTeacherKey")));
+    let live = true;
+    void apiRequest("/api/capabilities").then(async response => {
+      const data = await response.json();
+      if (live && response.ok && Array.isArray(data.kinds)) setSupportedKinds(data.kinds);
+    }).catch(() => {});
+    return () => { live = false; };
+  }, []);
+
+  const matches = useMemo(() => templateRegistry.filter(game =>
+    (game.title + " " + game.kind + " " + game.description)
+      .toLocaleLowerCase("es-MX").includes(search.trim().toLocaleLowerCase("es-MX"))), [search]);
+
+  function signOut() {
+    ["platformTeacherKey", "pairTeacherKey", "diagramTeacherKey"].forEach(key => sessionStorage.removeItem(key));
+    setTeacher(false);
+    setAccountOpen(false);
+  }
+
   return <main className="catalog-page">
-    <header className="catalog-header"><a className="catalog-brand" href="./"><span className="catalog-mark">A</span>Aula en juego</a><nav><a href="#juegos">Juegos</a><a className="catalog-teacher" href="?panel=actividades">Acceso del maestro</a></nav></header>
+    <header className="catalog-header">
+      <a className="catalog-brand" href="./"><span className="catalog-mark">A</span>Aula en juego</a>
+      <nav className="catalog-nav" aria-label="Navegación principal">
+        <a href="?panel=actividades">Mis actividades</a>
+        <a href="?panel=resultados">Mis resultados</a>
+        <a className="catalog-create-link" href="?panel=actividades&seccion=crear">Crear actividad <span aria-hidden="true">＋</span></a>
+        <div className="catalog-account">
+          <button type="button" aria-expanded={accountOpen} onClick={() => setAccountOpen(open => !open)}>{teacher ? "Docente" : "Cuenta"}<span aria-hidden="true">⌄</span></button>
+          {accountOpen && <div className="catalog-account-menu">
+            {teacher ? <><strong>Sesión docente</strong><button type="button" onClick={signOut}>Cerrar sesión</button></> : <a href="?panel=actividades">Acceso del maestro</a>}
+          </div>}
+        </div>
+      </nav>
+    </header>
     <div className="catalog-main">
-      <section className="catalog-hero"><div><span className="catalog-eyebrow">UN ESPACIO PARA APRENDER JUGANDO</span><h1>Los temas de clase, en una forma nueva.</h1><p>Elige una actividad breve, practica a tu ritmo y descubre cuánto puedes aprender mientras juegas.</p><a className="catalog-cta" href="#juegos">Explorar juegos <span aria-hidden="true">↓</span></a></div>
-        <div className="catalog-art" aria-hidden="true"><span className="catalog-art-note">Ideas que conectan</span><div className="catalog-art-board"><div className="catalog-mini-card"><div className="catalog-mini-image"><i className="d1"/><i className="d2"/><i className="d3"/></div><div className="catalog-mini-caption">Observa <small>1 · 2 · 3</small></div></div><div className="catalog-mini-card catalog-mini-pairs"><div>Palabra <b>↔</b></div><div>Imagen <b>↔</b></div><div>Idea <b>↔</b></div></div></div></div></section>
-      <section className="catalog-section" id="juegos"><div className="catalog-section-head"><div><span className="catalog-eyebrow">PARA TUS CLASES</span><h2>Elige un juego</h2></div><p>Actividades para practicar y recordar.</p></div>
-        <label className="catalog-search">Buscar actividad<input type="search" value={search} onChange={e=>setSearch(e.target.value)} placeholder="Escribe el nombre de un juego"/></label>
-        <div className="catalog-grid">{matches.map(g=>g.status==="ready"&&supportedKinds.includes(g.id==="diagram-labels"?"diagram":g.id)?<a className="catalog-card" key={g.id} href={g.id==="diagram-labels"?"./?modo=maestro&nueva=1":"./?juego="+(g.id==="pairs"?"parejas":g.id)+"&modo=maestro&nueva=1"}><div className="catalog-visual">{g.id==="diagram-labels"?<div className="diagram-icon"><b/><b/><b/></div>:<div className="pairs-icon"><i>A</i><i>1</i><i>●</i><i>↔</i></div>}</div><div className="catalog-card-content"><span className="catalog-card-kicker">{g.kind}</span><h3>{g.title}</h3><p>{g.description}</p><strong>Abrir juego <span>→</span></strong></div></a>:<article className="catalog-card catalog-soon" key={g.id} aria-label={g.title+", en preparación"}><div className="catalog-visual"><div className="pairs-icon"><i>···</i><i>?</i><i>✦</i><i>↔</i></div></div><div className="catalog-card-content"><span className="catalog-card-kicker">{g.kind} · EN PREPARACIÓN</span><h3>{g.title}</h3><p>{g.description}</p><strong>En preparación</strong></div></article>)}{!matches.length&&<p className="catalog-empty">No encontré un juego con ese nombre.</p>}</div>
+      <section className="catalog-section" id="juegos" aria-labelledby="games-title">
+        <div className="catalog-section-head"><div><span className="catalog-eyebrow">AULA EN JUEGO</span><h1 id="games-title">Elige una actividad</h1></div><p>Actividades listas para practicar en clase.</p></div>
+        <label className="catalog-search">Buscar actividad<input type="search" value={search} onChange={event => setSearch(event.target.value)} placeholder="Escribe el nombre de un juego" /></label>
+        <div className="catalog-grid">{matches.map(game => {
+          const serverKind = game.id === "diagram-labels" ? "diagram" : game.id;
+          const ready = game.status === "ready" && supportedKinds.includes(serverKind);
+          const href = game.id === "diagram-labels" ? "./?modo=maestro&nueva=1" : "./?juego=" + (game.id === "pairs" ? "parejas" : game.id) + "&modo=maestro&nueva=1";
+          return ready
+            ? <a className="catalog-card" key={game.id} href={href}>
+                <div className="catalog-visual" aria-hidden="true">{game.id === "diagram-labels" ? <div className="diagram-icon"><b/><b/><b/></div> : <div className="pairs-icon"><i>A</i><i>1</i><i>●</i><i>↔</i></div>}</div>
+                <div className="catalog-card-content"><span className="catalog-card-kicker">{game.kind}</span><h2>{game.title}</h2><p>{game.description}</p><strong>Crear actividad <span aria-hidden="true">→</span></strong></div>
+              </a>
+            : <article className="catalog-card catalog-soon" key={game.id} aria-label={game.title + ", en preparación"}>
+                <div className="catalog-visual" aria-hidden="true"><div className="pairs-icon"><i>···</i><i>?</i><i>✦</i><i>↔</i></div></div>
+                <div className="catalog-card-content"><span className="catalog-card-kicker">EN PREPARACIÓN</span><h2>{game.title}</h2><p>{game.description}</p><strong>Próximamente</strong></div>
+              </article>;
+        })}{!matches.length && <p className="catalog-empty">No encontré un juego con ese nombre.</p>}</div>
       </section>
-      <section className="catalog-how"><span className="catalog-eyebrow">FÁCIL DE USAR</span><h2>En tres pasos</h2><div className="catalog-steps"><article><b>01</b><strong>Elige</strong><span>Abre el juego para tu clase.</span></article><article><b>02</b><strong>Participa</strong><span>Resuelve desde el celular o computadora.</span></article><article><b>03</b><strong>Revisa</strong><span>Consulta tu resultado y sigue practicando.</span></article></div></section>
-      <footer className="catalog-footer"><span>Aula en juego · Actividades para aprender a tu ritmo</span><a href="?panel=actividades">Panel del maestro</a></footer>
+      <footer className="catalog-footer"><span>Aula en juego</span><a href="?panel=actividades">Espacio del docente</a></footer>
     </div>
   </main>;
 }
