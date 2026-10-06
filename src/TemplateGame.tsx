@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { Activity, ActivityKind, QuizQuestion, SortItem, SequenceStep } from "./default-activity";
-import { apiRequest, forgetTeacherKey, getTeacherKey, rememberTeacherKey, supportsActivityKind } from "./gas-client";
+import { apiRequest, forgetTeacherKey, getTeacherKey, rememberTeacherKey, supportsActivityKind, getStudentSession, saveStudentSession, clearStudentSession } from "./gas-client";
 import "./template-game.css";
 
 type Student = { paternalSurname:string; maternalSurname:string; givenNames:string };
@@ -29,8 +29,8 @@ export default function TemplateGame({kind}:Props){
  const [draft,setDraft]=useState<Activity>(()=>blank(kind));
  const [teacherKey,setTeacherKey]=useState(getTeacherKey());
  const [keyDraft,setKeyDraft]=useState("");
- const [student,setStudent]=useState<Student|null>(null);
- const [studentToken,setStudentToken]=useState("");
+ const [student,setStudent]=useState<Student|null>(()=>{const saved=getStudentSession()?.student;return saved?{paternalSurname:saved.paternalSurname,maternalSurname:saved.maternalSurname,givenNames:saved.givenNames}:null});
+ const [studentToken,setStudentToken]=useState(()=>getStudentSession()?.token||"");
  const [credentials,setCredentials]=useState({username:"",password:""});
  const [activityList,setActivityList]=useState<Activity[]>([]);
  const [notice,setNotice]=useState("");
@@ -125,7 +125,7 @@ export default function TemplateGame({kind}:Props){
   try{
    const response=await apiRequest("/api/student/login",{method:"POST",body:JSON.stringify(credentials)}),data=await response.json();
    if(!response.ok)throw Error(data.error||"Usuario o contraseña incorrectos.");
-   setStudent(data.student);setStudentToken(data.token);setCredentials({username:"",password:""});setBusy(false);
+   saveStudentSession(String(data.token),{...data.student,id:String(data.student.id)});setStudent(data.student);setStudentToken(data.token);setCredentials({username:"",password:""});setBusy(false);
    await start(data.student,data.token);
   }catch(e){setNotice(e instanceof Error?e.message:"No se pudo iniciar sesión.");setBusy(false)}
  }
@@ -170,7 +170,7 @@ export default function TemplateGame({kind}:Props){
  </form></section></main>;
 
  if(screen==="contest-intro")return <main className="tg-page tg-contest-page"><section className="tg-contest-intro"><span className="tg-kicker">CONCURSO DE PREGUNTAS</span><div className="tg-contest-emblem" aria-hidden="true">★</div><h1>{activity.title}</h1><p>{activity.instructions}</p><div className="tg-contest-stats"><span>{playQuestions.length} preguntas</span><span>{activity.timerMode==="none"?"Sin límite":activity.timerMode==="down"?"Tiempo: "+fmt(remaining||0):"Cronómetro listo"}</span></div><button className="tg-primary" onClick={()=>setScreen("play")}>Comenzar concurso</button></section></main>;
- if(screen==="login")return <main className="tg-page"><header className="tg-header"><a href="./">Aula en juego</a></header><form className="tg-login" onSubmit={studentLogin}><span className="tg-kicker">{title.toUpperCase()}</span><h1>{activity.title||title}</h1><p>Ingresa con tu cuenta de alumno para comenzar.</p><label>Usuario<input required autoComplete="username" value={credentials.username} onChange={e=>setCredentials({...credentials,username:e.target.value})}/></label><label>Contraseña<input required type="password" autoComplete="current-password" value={credentials.password} onChange={e=>setCredentials({...credentials,password:e.target.value})}/></label>{notice&&<p className="tg-notice">{notice}</p>}<button className="tg-primary" disabled={busy}>{busy?"Validando…":"Entrar y comenzar"}</button></form></main>;
+ if(screen==="login")return <main className="tg-page"><header className="tg-header"><a href="./">Aula en juego</a></header><form className="tg-login" onSubmit={studentLogin}><span className="tg-kicker">{title.toUpperCase()}</span><h1>{activity.title||title}</h1>{student&&studentToken?<><p>Hola, {student.givenNames} {student.paternalSurname}. Tu sesión sigue activa.</p><button type="button" className="tg-primary" disabled={busy} onClick={()=>void start()}>{busy?"Preparando…":"Comenzar actividad"}</button><button type="button" onClick={()=>{clearStudentSession();setStudent(null);setStudentToken("")}}>Cambiar de alumno</button></>:<><p>Ingresa con tu cuenta de alumno para comenzar.</p><label>Usuario<input required autoComplete="username" value={credentials.username} onChange={e=>setCredentials({...credentials,username:e.target.value})}/></label><label>Contraseña<input required type="password" autoComplete="current-password" value={credentials.password} onChange={e=>setCredentials({...credentials,password:e.target.value})}/></label><button className="tg-primary" disabled={busy}>{busy?"Validando…":"Entrar y comenzar"}</button></>}{notice&&<p className="tg-notice">{notice}</p>}</form></main>;
 
  if(screen==="play")return <main className="tg-page"><header className="tg-play-head"><a href="./">Aula en juego</a><span>{activity.timerMode==="none"?"Sin límite":timerText}</span><small>{attempts===null?"Intentos ilimitados":"Intentos restantes: "+attempts}</small></header><section className="tg-play-shell"><span className="tg-kicker">{title.toUpperCase()}</span><h1>{activity.title}</h1><p>{activity.instructions}</p>
  {isQuestionGame&&<div className={"tg-play-questions"+(kind==="quiz-show"?" tg-contest-questions":"")}>{playQuestions.map((q,index)=><article className="tg-question-card" key={q.id}><span className="tg-question-count">Pregunta {index+1} de {playQuestions.length}</span><h2>{q.prompt}</h2>{(q.imageUrl||q.imageData)&&<img className="tg-question-image" src={q.imageData||q.imageUrl||""} alt="Imagen de la pregunta"/>}<div className={"tg-answer-grid"+(isTrueFalse?" tg-true-false":"")}>{q.options.map(option=><button key={option.id} className={(answers[q.id]===option.id?"chosen ":"")+(isTrueFalse?(option.text==="Verdadero"?"tg-true":"tg-false"):"")} onClick={()=>setAnswers({...answers,[q.id]:option.id})}>{option.text}</button>)}</div></article>)}</div>}
@@ -178,6 +178,5 @@ export default function TemplateGame({kind}:Props){
  {kind==="sequence"&&<div className="tg-sequence">{order.map((step,index)=><article key={step.id}><span>{index+1}</span>{(step.imageUrl||step.imageData)&&<img src={step.imageData||step.imageUrl||""} alt=""/>}<strong>{step.text}</strong><div><button aria-label="Subir paso" disabled={index===0} onClick={()=>moveStep(index,-1)}>↑</button><button aria-label="Bajar paso" disabled={index===order.length-1} onClick={()=>moveStep(index,1)}>↓</button></div></article>)}</div>}
  {notice&&<p className="tg-notice">{notice}</p>}<button className="tg-primary tg-finish" disabled={busy} onClick={()=>void finish()}>{busy?"Guardando…":"Terminar y calificar"}</button></section></main>;
 
- return <main className="tg-page"><section className="tg-result"><span className="tg-kicker">RESULTADO</span><h1>{score?.timedOut?"Se acabó el tiempo":"Actividad terminada"}</h1><div className="tg-grade">{score?.grade??0}<small> / 10</small></div><p>{score?.correct??0} de {score?.total??playTotal} respuestas correctas.</p><p>Tiempo: {fmt(score?.elapsedSeconds??seconds)}{score?.remainingSeconds!==null&&score?.remainingSeconds!==undefined?" · Te sobraron "+fmt(score.remainingSeconds):""}</p><div className="tg-notice">{score?.attemptsRemaining===null?"Intentos ilimitados.":score?.attemptsRemaining===1?"Te queda 1 intento.":"Te quedan "+(score?.attemptsRemaining??0)+" intentos."}</div>{score&&(score.attemptsRemaining===null||score.attemptsRemaining>0)&&<button className="tg-primary" onClick={()=>{setScreen("login");setStudent(null);setStudentToken("");setScore(null)}}>Intentar de nuevo</button>}<a href="./?panel=actividades">Volver al inicio</a></section></main>;
+ return <main className="tg-page"><section className="tg-result"><span className="tg-kicker">RESULTADO</span><h1>{score?.timedOut?"Se acabó el tiempo":"Actividad terminada"}</h1><div className="tg-grade">{score?.grade??0}<small> / 10</small></div><p>{score?.correct??0} de {score?.total??playTotal} respuestas correctas.</p><p>Tiempo: {fmt(score?.elapsedSeconds??seconds)}{score?.remainingSeconds!==null&&score?.remainingSeconds!==undefined?" · Te sobraron "+fmt(score.remainingSeconds):""}</p><div className="tg-notice">{score?.attemptsRemaining===null?"Intentos ilimitados.":score?.attemptsRemaining===1?"Te queda 1 intento.":"Te quedan "+(score?.attemptsRemaining??0)+" intentos."}</div>{score&&(score.attemptsRemaining===null||score.attemptsRemaining>0)&&<button className="tg-primary" onClick={()=>{setScreen("login");setScore(null)}}>Intentar de nuevo</button>}<a href="./?panel=actividades">Volver al inicio</a></section></main>;
 }
-
