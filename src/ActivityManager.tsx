@@ -7,7 +7,9 @@ import "./activity-manager.css";
 function editorUrl(activity?: Activity, templateId = "diagram-labels", duplicate = false) {
   const url = new URL(window.location.href);
   url.search = "";
-  if (activity?.kind === "pairs" || templateId === "pairs") url.searchParams.set("juego", "parejas");
+  const selected = activity?.kind || templateId;
+  if (selected === "pairs") url.searchParams.set("juego", "parejas");
+  else if (selected !== "diagram" && selected !== "diagram-labels") url.searchParams.set("juego", selected);
   url.searchParams.set("modo", "maestro");
   if (activity && !duplicate) url.searchParams.set("actividad", activity.id);
   if (duplicate) url.searchParams.set("duplicar", "1");
@@ -19,6 +21,7 @@ function studentUrl(activity: Activity) {
   const url = new URL(window.location.href);
   url.search = "";
   if (activity.kind === "pairs") url.searchParams.set("juego", "parejas");
+  else if (activity.kind && activity.kind !== "diagram") url.searchParams.set("juego", activity.kind);
   url.searchParams.set("actividad", activity.id);
   return url.toString();
 }
@@ -122,7 +125,7 @@ export default function ActivityManager() {
       <section className="am-create"><div><h2>Crear actividad</h2><p>Al elegir una plantilla disponible, se abre su editor directamente.</p></div><div className="am-template-grid">{available.map(template=><a key={template.id} className="am-template-card" href={editorUrl(undefined,template.id)}><span>{template.id==="pairs"?"↔":"◎"}</span><b>{template.title}</b><small>{template.description}</small><strong>Crear actividad →</strong></a>)}</div>
       <details className="am-planned"><summary>Plantillas en preparación ({planned.length})</summary><div>{planned.map(template=><span key={template.id}>{template.title}</span>)}</div></details></section>
       <section className="am-list"><div className="am-list-heading"><div><span className="am-kicker">GUARDADAS EN TU HOJA</span><h2>Actividades</h2></div><span>{activities.length} {activities.length===1?"actividad":"actividades"}</span></div>
-        {!activities.length?<div className="am-empty">Todavía no hay actividades guardadas. Crea una con los botones de arriba.</div>:<div className="am-activity-grid">{activities.map(activity=>{const definition=templateRegistry.find(item=>item.id===(activity.kind==="pairs"?"pairs":"diagram-labels"));return <article className="am-activity-card" key={activity.id}><div className="am-card-top"><span>{definition?.title||"Actividad"}</span><button aria-label={"Compartir "+activity.title} onClick={()=>void share(activity)}>{copied===activity.id?"Enlace copiado ✓":"Compartir ↗"}</button></div><h3>{activity.title}</h3><p>{activity.kind==="pairs"?((activity.pairs||[]).length+" parejas"):((activity.labels||[]).length+" etiquetas")}</p><div className="am-card-actions"><a href={editorUrl(activity)}>Editar</a><button onClick={()=>void duplicate(activity)} disabled={busy}>Duplicar</button><button className="am-archive" onClick={()=>void archive(activity)} disabled={busy}>Eliminar</button></div></article>})}</div>}
+        {!activities.length?<div className="am-empty">Todavía no hay actividades guardadas. Crea una con los botones de arriba.</div>:<div className="am-activity-grid">{activities.map(activity=>{const definition=templateRegistry.find(item=>item.id===(activity.kind==="diagram"||!activity.kind?"diagram-labels":activity.kind));return <article className="am-activity-card" key={activity.id}><div className="am-card-top"><span>{definition?.title||"Actividad"}</span><button aria-label={"Compartir "+activity.title} onClick={()=>void share(activity)}>{copied===activity.id?"Enlace copiado ✓":"Compartir ↗"}</button></div><h3>{activity.title}</h3><p>{activity.kind==="pairs"?((activity.pairs||[]).length+" parejas"):activity.kind==="quiz"?((activity.questions||[]).length+" preguntas"):activity.kind==="group-sort"?((activity.items||[]).length+" elementos"):activity.kind==="sequence"?((activity.steps||[]).length+" pasos"):((activity.labels||[]).length+" etiquetas")}</p><div className="am-card-actions"><a href={editorUrl(activity)}>Editar</a><button onClick={()=>void duplicate(activity)} disabled={busy}>Duplicar</button><button className="am-archive" onClick={()=>void archive(activity)} disabled={busy}>Eliminar</button></div></article>})}</div>}
         <p className="am-footnote">Eliminar archiva la actividad de esta lista. Los resultados anteriores se conservan.</p>
       </section>
     </section>
