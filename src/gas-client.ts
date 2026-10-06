@@ -7,8 +7,13 @@ const teacherKeyNames = ["platformTeacherKey", "pairTeacherKey", "diagramTeacher
 
 export function getTeacherKey() {
   for (const name of teacherKeyNames) {
-    const value = localStorage.getItem(name) || sessionStorage.getItem(name);
-    if (value) return value;
+    const persistent = localStorage.getItem(name);
+    if (persistent) return persistent;
+    const sessionValue = sessionStorage.getItem(name);
+    if (sessionValue) {
+      rememberTeacherKey(sessionValue);
+      return sessionValue;
+    }
   }
   return "";
 }
