@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { Activity, ActivityKind, QuizQuestion, SortItem, SequenceStep } from "./default-activity";
-import { apiRequest } from "./gas-client";
+import { apiRequest, supportsActivityKind } from "./gas-client";
 import "./template-game.css";
 
 type Student = { paternalSurname:string; maternalSurname:string; givenNames:string };
@@ -21,7 +21,7 @@ function randomize<T>(items:T[]){const copy=[...items];for(let i=copy.length-1;i
 function readImage(file?:File){return new Promise<string>((resolve,reject)=>{if(!file)return resolve("");if(file.size>5*1024*1024)return reject(Error("La imagen debe pesar menos de 5 MB."));if(!/^image\/(png|jpeg|webp)$/.test(file.type))return reject(Error("Usa una imagen PNG, JPG o WebP."));const reader=new FileReader();reader.onload=()=>resolve(String(reader.result));reader.onerror=()=>reject(Error("No se pudo leer la imagen."));reader.readAsDataURL(file)})}
 
 export default function TemplateGame({kind}:Props){
- const [screen,setScreen]=useState<"loading"|"teacher-key"|"teacher"|"login"|"play"|"result">("loading");
+ const [screen,setScreen]=useState<"loading"|"teacher-key"|"teacher"|"login"|"play"|"result"|"unsupported">("loading");
  const [activity,setActivity]=useState<Activity>(()=>blank(kind));
  const [draft,setDraft]=useState<Activity>(()=>blank(kind));
  const [teacherKey,setTeacherKey]=useState(sessionStorage.getItem("platformTeacherKey")||"");
@@ -62,7 +62,7 @@ export default function TemplateGame({kind}:Props){
    const key=sessionStorage.getItem("platformTeacherKey")||sessionStorage.getItem("diagramTeacherKey")||"";
    if(!key){setScreen("teacher-key");return}
    setTeacherKey(key);
-   void getTeacherActivities(key).then(async()=>{
+   void supportsActivityKind(kind).then(supported=>{if(!supported){setNotice("Para activar esta plantilla, actualiza el Apps Script existente desde el archivo Code.gs del proyecto.");setScreen("unsupported");return false}return true}).then(supported=>supported?getTeacherActivities(key):null).then(async result=>{if(!result)return;
     const savedId=q.get("actividad");
     if(savedId)await loadSaved(savedId);
     else if(q.get("nueva")==="1"){const fresh=blank(kind);setDraft(fresh);setActivity(fresh)}
@@ -85,7 +85,7 @@ export default function TemplateGame({kind}:Props){
 
  async function teacherEnter(event:React.FormEvent){
   event.preventDefault();setBusy(true);setNotice("");
-  try{await getTeacherActivities(keyDraft);setTeacherKey(keyDraft);sessionStorage.setItem("platformTeacherKey",keyDraft);sessionStorage.setItem("diagramTeacherKey",keyDraft);sessionStorage.setItem("pairTeacherKey",keyDraft);const q=new URLSearchParams(location.search);if(q.get("actividad"))await loadSaved(q.get("actividad")!);else if(q.get("nueva")==="1"){const fresh=blank(kind);setActivity(fresh);setDraft(fresh)}setScreen("teacher")}
+  try{if(!await supportsActivityKind(kind)){setNotice("Actualiza primero el Apps Script existente con el archivo Code.gs de la plataforma.");setScreen("unsupported");return}await getTeacherActivities(keyDraft);setTeacherKey(keyDraft);sessionStorage.setItem("platformTeacherKey",keyDraft);sessionStorage.setItem("diagramTeacherKey",keyDraft);sessionStorage.setItem("pairTeacherKey",keyDraft);const q=new URLSearchParams(location.search);if(q.get("actividad"))await loadSaved(q.get("actividad")!);else if(q.get("nueva")==="1"){const fresh=blank(kind);setActivity(fresh);setDraft(fresh)}setScreen("teacher")}
   catch(e){setNotice(e instanceof Error?e.message:"No se pudo validar la clave.")}
   finally{setBusy(false)}
  }
@@ -154,6 +154,7 @@ export default function TemplateGame({kind}:Props){
   </article>;
  }
 
+ if(screen==="unsupported")return <main className="tg-page"><section className="tg-login"><span className="tg-kicker">PLANTILLA EN PREPARACIÓN</span><h1>{title}</h1><p>{notice}</p><a href="./?panel=actividades">Volver a Mis actividades</a></section></main>;
  if(screen==="teacher-key")return <main className="tg-page"><header className="tg-header"><a href="./">Aula en juego</a><a href="?panel=actividades">Mis actividades</a></header><form className="tg-login" onSubmit={teacherEnter}><span className="tg-kicker">EDITOR DE ACTIVIDAD · {title.toLocaleUpperCase("es-MX")}</span><h1>Acceso del maestro</h1><p>Ingresa la clave para crear o editar una actividad.</p><label>Clave del maestro<input type="password" required value={keyDraft} onChange={e=>setKeyDraft(e.target.value)}/></label>{notice&&<p className="tg-notice">{notice}</p>}<button className="tg-primary" disabled={busy}>{busy?"Conectando…":"Continuar al editor"}</button></form></main>;
 
  if(screen==="teacher")return <main className="tg-page"><header className="tg-header"><a href="./?panel=actividades">Mis actividades</a><span>{title}</span></header><section className="tg-shell"><div className="tg-title"><div><span className="tg-kicker">INTRODUCIR CONTENIDO</span><h1>{draft.title||"Nueva actividad"}</h1><p>Escribe el contenido. Los ajustes comunes se guardan junto a esta plantilla.</p></div><label>Abrir guardada<select value={activity.id||""} onChange={e=>{const found=activityList.find(a=>a.id===e.target.value);if(found){setDraft(found);setActivity(found)}}}><option value="">Actividad nueva</option>{activityList.map(a=><option key={a.id} value={a.id}>{a.title}</option>)}</select></label></div>
