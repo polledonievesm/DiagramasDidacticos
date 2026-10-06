@@ -35,7 +35,7 @@ const REPORT_CACHE_MS = 2 * 60 * 1000;
 function readReportCache(): { savedAt: number; results: Record<string, unknown>[]; students: StudentRow[] } | null {
   try {
     const value = JSON.parse(sessionStorage.getItem(REPORT_CACHE_KEY) || "null") as { savedAt?: number; results?: Record<string, unknown>[]; students?: StudentRow[] } | null;
-    if (!value || !Array.isArray(value.results) || !Array.isArray(value.students)) return null;
+    if (!value || typeof value.savedAt !== "number" || !Array.isArray(value.results) || !Array.isArray(value.students)) return null;
     return value;
   } catch { return null; }
 }
@@ -96,6 +96,7 @@ export default function ActivityManager() {
     setActivities(ordered);
     setSupportedKinds(kinds);
     sessionStorage.setItem(PANEL_CACHE_KEY, JSON.stringify({ savedAt: Date.now(), activities: ordered, supportedKinds: kinds }));
+    setNotice("");
     setReady(true);
   }
 
@@ -150,21 +151,16 @@ export default function ActivityManager() {
     }
   }, [key, view]);
 
-  async function enter(event: React.FormEvent) {
+  function enter(event: React.FormEvent) {
     event.preventDefault();
-    setBusy(true); setNotice("");
-    // Keep the teacher session even if Apps Script times out while loading the first page.
+    setBusy(true);
+    setNotice("Conectando con tu hoja…");
+    // Open the teacher panel immediately. A slow Sheets request must never send
+    // the teacher back to the password form after a successful local sign-in.
     rememberTeacherKey(draftKey);
     setKey(draftKey);
-    try {
-      await loadActivities(draftKey);
-    } catch (error) {
-      if (isUnauthorized(error)) {
-        forgetTeacherKey();
-        setKey("");
-      }
-      setNotice(error instanceof Error ? error.message : "No se pudo abrir el panel.");
-    } finally { setBusy(false); }
+    setReady(true);
+    void loadActivities(draftKey).catch(handlePanelError).finally(() => setBusy(false));
   }
 
   async function refresh() {
