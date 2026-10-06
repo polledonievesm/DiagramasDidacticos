@@ -8,7 +8,8 @@ export type SortItem = { id: string; text: string; imageUrl?: string | null; ima
 export type SequenceStep = { id: string; text: string; imageUrl?: string | null; imageData?: string | null; order: number };
 export type FillSentence = { id: string; before: string; answer: string; after: string; imageUrl?: string | null; imageData?: string | null };
 export type WordOrderSentence = { id: string; text: string; words?: Array<{ id: string; text: string; order: number }> };
-export type ActivityKind = "diagram" | "pairs" | "quiz" | "group-sort" | "sequence" | "flashcards" | "memory" | "complete-sentence" | "word-order";
+export type WheelEntry = { id: string; text: string; imageUrl?: string | null; imageData?: string | null };
+export type ActivityKind = "diagram" | "pairs" | "quiz" | "group-sort" | "sequence" | "flashcards" | "memory" | "complete-sentence" | "word-order" | "roulette" | "word-search";
 export type Activity = {
   kind?: ActivityKind;
   pairs?: MatchingPair[];
@@ -18,6 +19,10 @@ export type Activity = {
   steps?: SequenceStep[];
   sentences?: FillSentence[];
   wordSentences?: WordOrderSentence[];
+  wheelEntries?: WheelEntry[];
+  wordSearchWords?: string[];
+  wordSearchGridSize?: number;
+  wordSearchDirections?: string[];
   shuffle?: boolean;
   sound?: boolean;
   scoring?: boolean;
