@@ -203,3 +203,11 @@ export async function apiRequest(path: string, init: RequestInit = {}) {
   }
   return response({ error: "Operación no reconocida." }, 404);
 }
+
+export async function supportsActivityKind(kind: string) {
+  try {
+    const result = await apiRequest("/api/capabilities");
+    const data = await result.json();
+    return result.ok && Array.isArray(data.kinds) && data.kinds.includes(kind);
+  } catch { return false; }
+}
