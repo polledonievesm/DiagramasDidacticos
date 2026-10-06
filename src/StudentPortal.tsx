@@ -45,8 +45,53 @@ export default function StudentPortal() {
 
   function signOut() { clearStudentSession();setSession(null);setPortal(null);setNotice(""); }
 
-  if(!portal) return <main className="student-portal"><header className="sp-header"><a href="./">Aula en juego</a><span>Espacio del alumno</span></header><form className="sp-login" onSubmit={signIn}><span className="sp-kicker">ACCESO DEL ALUMNO</span><h1>Entra a tus actividades</h1><p>Usa el usuario y la contraseña que te entregó tu maestro.</p><label>Usuario<input autoComplete="username" value={credentials.username} onChange={event=>setCredentials({...credentials,username:event.target.value})} required/></label><label>Contraseña<input type="password" autoComplete="current-password" value={credentials.password} onChange={event=>setCredentials({...credentials,password:event.target.value})} required/></label>{notice&&<p className="sp-notice">{notice}</p>}<button disabled={busy}>{busy?"Entrando…":"Ver mis actividades"}</button></form></main>;
+  if(!portal) return (
+    <main className="student-portal">
+      <header className="sp-header"><a href="./">Aula en juego</a><span>Espacio del alumno</span></header>
+      <form className="sp-login" onSubmit={signIn}>
+        <span className="sp-kicker">ACCESO DEL ALUMNO</span><h1>Entra a tus actividades</h1>
+        <p>Usa el usuario y la contraseña que te entregó tu maestro.</p>
+        <label>Usuario<input autoComplete="username" value={credentials.username} onChange={event=>setCredentials({...credentials,username:event.target.value})} required/></label>
+        <label>Contraseña<input type="password" autoComplete="current-password" value={credentials.password} onChange={event=>setCredentials({...credentials,password:event.target.value})} required/></label>
+        {notice&&<p className="sp-notice">{notice}</p>}
+        <button disabled={busy}>{busy?"Entrando…":"Ver mis actividades"}</button>
+      </form>
+    </main>
+  );
 
   const open=portal.activities.filter(item=>!item.expired),expired=portal.activities.filter(item=>item.expired);
-  return <main className="student-portal"><header className="sp-header"><a href="./">Aula en juego</a><span>Espacio del alumno</span><button onClick={signOut}>Cerrar sesión</button></header><section className="sp-main"><div className="sp-welcome"><div><span className="sp-kicker">MI APRENDIZAJE</span><h1>Hola, {portal.student.name} {portal.student.paternalSurname}</h1><p>Revisa tus actividades y continúa aprendiendo.</p></div><div className="sp-average"><span>Promedio de actividades realizadas</span><strong>{portal.average===null?"—":portal.average.toFixed(1)}<small>/10</small></strong><small>{portal.completedCount} realizadas de {portal.activities.length}</small></div></div><section className="sp-section"><h2>Actividades disponibles <span>{open.length}</span></h2>{open.length?<div className="sp-grid">{open.map(item=><article className="sp-card" key={item.id}><div className="sp-card-status">{item.completed?"Realizada":"Pendiente"}</div><h3>{item.title}</h3><p>{item.completed?`Tu mejor calificación: ${Number(item.bestGrade).toFixed(1)} / 10 · ${item.attempts} ${item.attempts===1?"intento":"intentos"}`:"Aún no la has realizado."}</p><small>{item.dueAt?`Disponible hasta ${new Date(item.dueAt).toLocaleString("es-MX")}`:"Sin fecha de cierre"}</small><a href={activityLink(item)}>{item.completed?"Volver a practicar":"Comenzar actividad"} →</a></article>)}</div>:<p className="sp-empty">No tienes actividades disponibles por ahora.</p>}</section>{expired.length>0&&<section className="sp-section sp-expired"><h2>Plazo terminado <span>{expired.length}</span></h2><div className="sp-grid">{expired.map(item=><article className="sp-card" key={item.id}><div className="sp-card-status">{item.completed?"Cerrada · realizada":"Cerrada · pendiente"}</div><h3>{item.title}</h3><p>{item.completed?`Mejor calificación: ${Number(item.bestGrade).toFixed(1)} / 10 · ${item.attempts} intentos`:"No se registró una entrega antes del cierre."}</p><small>Terminó {item.dueAt?new Date(item.dueAt).toLocaleString("es-MX"):""}</small></article>)}</div></section></section></main>;
+  return (
+    <main className="student-portal">
+      <header className="sp-header"><a href="./">Aula en juego</a><span>Espacio del alumno</span><button onClick={signOut}>Cerrar sesión</button></header>
+      <section className="sp-main">
+        <div className="sp-welcome">
+          <div><span className="sp-kicker">MI APRENDIZAJE</span><h1>Hola, {portal.student.name} {portal.student.paternalSurname}</h1><p>Revisa tus actividades y continúa aprendiendo.</p></div>
+          <div className="sp-average"><span>Promedio de actividades realizadas</span><strong>{portal.average===null?"—":portal.average.toFixed(1)}<small>/10</small></strong><small>{portal.completedCount} realizadas de {portal.activities.length}</small></div>
+        </div>
+        <section className="sp-section">
+          <h2>Actividades disponibles <span>{open.length}</span></h2>
+          {open.length ? <div className="sp-grid">{open.map(item => (
+            <article className="sp-card" key={item.id}>
+              <div className="sp-card-status">{item.completed ? "Realizada" : "Pendiente"}</div>
+              <h3>{item.title}</h3>
+              <p>{item.completed ? `Tu mejor calificación: ${Number(item.bestGrade).toFixed(1)} / 10 · ${item.attempts} ${item.attempts===1 ? "intento" : "intentos"}` : "Aún no la has realizado."}</p>
+              <small>{item.dueAt ? `Disponible hasta ${new Date(item.dueAt).toLocaleString("es-MX")}` : "Sin fecha de cierre"}</small>
+              <a href={activityLink(item)}>{item.completed ? "Volver a practicar" : "Comenzar actividad"} →</a>
+            </article>
+          ))}</div> : <p className="sp-empty">No tienes actividades disponibles por ahora.</p>}
+        </section>
+        {expired.length > 0 && <section className="sp-section sp-expired">
+          <h2>Plazo terminado <span>{expired.length}</span></h2>
+          <div className="sp-grid">{expired.map(item => (
+            <article className="sp-card" key={item.id}>
+              <div className="sp-card-status">{item.completed ? "Cerrada · realizada" : "Cerrada · pendiente"}</div>
+              <h3>{item.title}</h3>
+              <p>{item.completed ? `Mejor calificación: ${Number(item.bestGrade).toFixed(1)} / 10 · ${item.attempts} intentos` : "No se registró una entrega antes del cierre."}</p>
+              <small>Terminó {item.dueAt ? new Date(item.dueAt).toLocaleString("es-MX") : ""}</small>
+            </article>
+          ))}</div>
+        </section>}
+      </section>
+    </main>
+  );
 }
