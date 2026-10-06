@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { Activity, ActivityKind, QuizQuestion, SortItem, SequenceStep } from "./default-activity";
-import { apiRequest, supportsActivityKind } from "./gas-client";
+import { apiRequest, forgetTeacherKey, getTeacherKey, rememberTeacherKey, supportsActivityKind } from "./gas-client";
 import "./template-game.css";
 
 type Student = { paternalSurname:string; maternalSurname:string; givenNames:string };
@@ -27,7 +27,7 @@ export default function TemplateGame({kind}:Props){
  const [screen,setScreen]=useState<"loading"|"teacher-key"|"teacher"|"login"|"play"|"contest-intro"|"result"|"unsupported">("loading");
  const [activity,setActivity]=useState<Activity>(()=>blank(kind));
  const [draft,setDraft]=useState<Activity>(()=>blank(kind));
- const [teacherKey,setTeacherKey]=useState(sessionStorage.getItem("platformTeacherKey")||"");
+ const [teacherKey,setTeacherKey]=useState(getTeacherKey());
  const [keyDraft,setKeyDraft]=useState("");
  const [student,setStudent]=useState<Student|null>(null);
  const [studentToken,setStudentToken]=useState("");
@@ -62,7 +62,7 @@ export default function TemplateGame({kind}:Props){
  useEffect(()=>{
   const q=new URLSearchParams(location.search);
   if(q.get("modo")==="maestro"){
-   const key=sessionStorage.getItem("platformTeacherKey")||sessionStorage.getItem("diagramTeacherKey")||"";
+   const key=getTeacherKey();
    if(!key){setScreen("teacher-key");return}
    setTeacherKey(key);
    void supportsActivityKind(kind).then(supported=>{if(!supported){setNotice("Para activar esta plantilla, actualiza el Apps Script existente desde el archivo Code.gs del proyecto.");setScreen("unsupported");return false}return true}).then(supported=>supported?getTeacherActivities(key):null).then(async result=>{if(!result)return;
@@ -70,7 +70,7 @@ export default function TemplateGame({kind}:Props){
     if(savedId)await loadSaved(savedId);
     else if(q.get("nueva")==="1"){const fresh=blank(kind);setDraft(fresh);setActivity(fresh)}
     setScreen("teacher")
-   }).catch(e=>{sessionStorage.removeItem("platformTeacherKey");sessionStorage.removeItem("diagramTeacherKey");setNotice(e instanceof Error?e.message:"No se pudo cargar el editor.");setScreen("teacher-key")});
+   }).catch(e=>{forgetTeacherKey();setNotice(e instanceof Error?e.message:"No se pudo cargar el editor.");setScreen("teacher-key")});
    return;
   }
   const activityId=q.get("actividad");
@@ -88,7 +88,7 @@ export default function TemplateGame({kind}:Props){
 
  async function teacherEnter(event:React.FormEvent){
   event.preventDefault();setBusy(true);setNotice("");
-  try{if(!await supportsActivityKind(kind)){setNotice("Actualiza primero el Apps Script existente con el archivo Code.gs de la plataforma.");setScreen("unsupported");return}await getTeacherActivities(keyDraft);setTeacherKey(keyDraft);sessionStorage.setItem("platformTeacherKey",keyDraft);sessionStorage.setItem("diagramTeacherKey",keyDraft);sessionStorage.setItem("pairTeacherKey",keyDraft);const q=new URLSearchParams(location.search);if(q.get("actividad"))await loadSaved(q.get("actividad")!);else if(q.get("nueva")==="1"){const fresh=blank(kind);setActivity(fresh);setDraft(fresh)}setScreen("teacher")}
+  try{if(!await supportsActivityKind(kind)){setNotice("Actualiza primero el Apps Script existente con el archivo Code.gs de la plataforma.");setScreen("unsupported");return}await getTeacherActivities(keyDraft);setTeacherKey(keyDraft);rememberTeacherKey(keyDraft);const q=new URLSearchParams(location.search);if(q.get("actividad"))await loadSaved(q.get("actividad")!);else if(q.get("nueva")==="1"){const fresh=blank(kind);setActivity(fresh);setDraft(fresh)}setScreen("teacher")}
   catch(e){setNotice(e instanceof Error?e.message:"No se pudo validar la clave.")}
   finally{setBusy(false)}
  }
@@ -180,3 +180,4 @@ export default function TemplateGame({kind}:Props){
 
  return <main className="tg-page"><section className="tg-result"><span className="tg-kicker">RESULTADO</span><h1>{score?.timedOut?"Se acabó el tiempo":"Actividad terminada"}</h1><div className="tg-grade">{score?.grade??0}<small> / 10</small></div><p>{score?.correct??0} de {score?.total??playTotal} respuestas correctas.</p><p>Tiempo: {fmt(score?.elapsedSeconds??seconds)}{score?.remainingSeconds!==null&&score?.remainingSeconds!==undefined?" · Te sobraron "+fmt(score.remainingSeconds):""}</p><div className="tg-notice">{score?.attemptsRemaining===null?"Intentos ilimitados.":score?.attemptsRemaining===1?"Te queda 1 intento.":"Te quedan "+(score?.attemptsRemaining??0)+" intentos."}</div>{score&&(score.attemptsRemaining===null||score.attemptsRemaining>0)&&<button className="tg-primary" onClick={()=>{setScreen("login");setStudent(null);setStudentToken("");setScore(null)}}>Intentar de nuevo</button>}<a href="./?panel=actividades">Volver al inicio</a></section></main>;
 }
+

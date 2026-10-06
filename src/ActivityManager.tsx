@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { Activity } from "./default-activity";
 import { templateRegistry } from "./template-registry";
-import { apiRequest } from "./gas-client";
+import { apiRequest, forgetTeacherKey, getTeacherKey, rememberTeacherKey } from "./gas-client";
 import "./activity-manager.css";
 
 function editorUrl(activity?: Activity, templateId = "diagram-labels", duplicate = false) {
@@ -27,8 +27,10 @@ function studentUrl(activity: Activity) {
 }
 
 export default function ActivityManager() {
-  const view = new URLSearchParams(window.location.search).get("panel") === "resultados" ? "results" : "activities";
-  const [key, setKey] = useState(sessionStorage.getItem("platformTeacherKey") || "");
+  const query = new URLSearchParams(window.location.search);
+  const view = query.get("panel") === "resultados" ? "results" : "activities";
+  const section = query.get("seccion") === "crear" ? "create" : "home";
+  const [key, setKey] = useState(getTeacherKey);
   const [draftKey, setDraftKey] = useState("");
   const [activities, setActivities] = useState<Activity[]>([]);
   const [busy, setBusy] = useState(false);
@@ -65,7 +67,7 @@ export default function ActivityManager() {
   useEffect(() => {
     if (!key) return;
     void loadActivities(key).catch(() => {
-      sessionStorage.removeItem("platformTeacherKey");
+      forgetTeacherKey();
       setKey("");
     });
   }, []);
@@ -74,20 +76,13 @@ export default function ActivityManager() {
     if (key && view === "results") void loadResults(key).catch(error => setNotice(error instanceof Error ? error.message : "No se pudieron cargar los resultados."));
   }, [key, view]);
 
-  useEffect(() => {
-    if (!ready || view !== "activities" || new URLSearchParams(window.location.search).get("seccion") !== "crear") return;
-    window.requestAnimationFrame(() => document.getElementById("crear")?.scrollIntoView({ behavior: "smooth", block: "start" }));
-  }, [ready, view]);
-
   async function enter(event: React.FormEvent) {
     event.preventDefault();
     setBusy(true); setNotice("");
     try {
       await loadActivities(draftKey);
       setKey(draftKey);
-      sessionStorage.setItem("platformTeacherKey", draftKey);
-      sessionStorage.setItem("pairTeacherKey", draftKey);
-      sessionStorage.setItem("diagramTeacherKey", draftKey);
+      rememberTeacherKey(draftKey);
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "No se pudo abrir el panel.");
     } finally { setBusy(false); }
@@ -153,15 +148,18 @@ export default function ActivityManager() {
   const planned = templateRegistry.filter(template => template.status !== "ready");
 
   return <main className="activity-manager-page">
-    <header className="am-header"><a href="./"><span className="am-logo">A</span>Aula en juego</a><nav className="am-top-nav"><a className={view === "activities" ? "active" : ""} href="?panel=actividades">Mis actividades</a><a className={view === "results" ? "active" : ""} href="?panel=resultados">Mis resultados</a><a className="am-nav-create" href="?panel=actividades&seccion=crear#crear">Crear actividad</a><div className="am-account"><button aria-expanded={accountOpen} onClick={() => setAccountOpen(open => !open)}>Docente <span aria-hidden="true">⌄</span></button>{accountOpen&&<div className="am-account-menu"><strong>Sesión docente</strong><button onClick={()=>{sessionStorage.removeItem("platformTeacherKey");sessionStorage.removeItem("pairTeacherKey");sessionStorage.removeItem("diagramTeacherKey");setKey("");setReady(false);setDraftKey("");setAccountOpen(false);}}>Cerrar sesión</button></div>}</div></nav></header>
+    <header className="am-header"><a href="./"><span className="am-logo">A</span>Aula en juego</a><nav className="am-top-nav"><a className={view === "activities" ? "active" : ""} href="?panel=actividades">Mis actividades</a><a className={view === "results" ? "active" : ""} href="?panel=resultados">Mis resultados</a><a className={`am-nav-create ${section === "create" ? "active" : ""}`} href="?panel=actividades&seccion=crear">Crear actividad</a><div className="am-account"><button aria-expanded={accountOpen} onClick={() => setAccountOpen(open => !open)}>Docente <span aria-hidden="true">⌄</span></button>{accountOpen&&<div className="am-account-menu"><strong>Sesión docente</strong><button onClick={()=>{forgetTeacherKey();setKey("");setReady(false);setDraftKey("");setAccountOpen(false);}}>Cerrar sesión</button></div>}</div></nav></header>
     <section className="am-main">
-      {view === "results" ? <section className="am-list am-results-panel"><div className="am-list-heading"><div><span className="am-kicker">REGISTRO DEL GRUPO</span><h1>Mis resultados</h1><p>Resultados guardados en tu hoja privada.</p></div><button className="am-refresh" onClick={()=>void refresh()} disabled={busy}>Actualizar resultados</button></div>{notice&&<p className="am-notice" role="status">{notice}</p>}{!results.length?<div className="am-empty">Todavía no hay resultados registrados.</div>:<div className="am-results-table-wrap"><table><thead><tr><th>Alumno</th><th>Actividad</th><th>Aciertos</th><th>Calificación</th><th>Tiempo</th><th>Fecha</th></tr></thead><tbody>{results.map((row,index)=>{const activity=activities.find(item=>item.id===String(row.activity_id));const name=[row.given_names,row.paternal_surname].map(value=>String(value||"").trim()).filter(Boolean).join(" ");const duration=Math.max(0,Number(row.elapsed_seconds)||0);const submitted=row.submitted_at?new Date(String(row.submitted_at)).toLocaleString("es-MX"):"—";return <tr key={String(row.id||index)}><td>{name||"Alumno"}</td><td>{activity?.title||"Actividad"}</td><td>{String(row.correct||0)} / {String(row.total||0)}</td><td>{String(row.grade||0)} / 10</td><td>{Math.floor(duration/60)}:{String(duration%60).padStart(2,"0")}</td><td>{submitted}</td></tr>})}</tbody></table></div>}</section> : <>
-      <div className="am-heading"><div><span className="am-kicker">TU ESPACIO DE TRABAJO</span><h1>Mis actividades</h1><p>Crea, organiza y comparte actividades para tu grupo.</p></div><button className="am-refresh" onClick={()=>void refresh()} disabled={busy}>Actualizar lista</button></div>
+      {view === "results" ? <section className="am-list am-results-panel"><div className="am-list-heading"><div><span className="am-kicker">REGISTRO DEL GRUPO</span><h1>Mis resultados</h1><p>Resultados guardados en tu hoja privada.</p></div><button className="am-refresh" onClick={()=>void refresh()} disabled={busy}>Actualizar resultados</button></div>{notice&&<p className="am-notice" role="status">{notice}</p>}{!results.length?<div className="am-empty">Todavía no hay resultados registrados.</div>:<div className="am-results-table-wrap"><table><thead><tr><th>Alumno</th><th>Actividad</th><th>Aciertos</th><th>Calificación</th><th>Tiempo</th><th>Fecha</th></tr></thead><tbody>{results.map((row,index)=>{const activity=activities.find(item=>item.id===String(row.activity_id));const name=[row.given_names,row.paternal_surname].map(value=>String(value||"").trim()).filter(Boolean).join(" ");const duration=Math.max(0,Number(row.elapsed_seconds)||0);const submitted=row.submitted_at?new Date(String(row.submitted_at)).toLocaleString("es-MX"):"—";return <tr key={String(row.id||index)}><td>{name||"Alumno"}</td><td>{activity?.title||"Actividad"}</td><td>{String(row.correct||0)} / {String(row.total||0)}</td><td>{String(row.grade||0)} / 10</td><td>{Math.floor(duration/60)}:{String(duration%60).padStart(2,"0")}</td><td>{submitted}</td></tr>})}</tbody></table></div>}</section> : section === "create" ? <>
+      <div className="am-heading"><div><span className="am-kicker">NUEVA ACTIVIDAD</span><h1>Elige una plantilla</h1><p>Al elegir un tipo de juego, se abrirá directamente su editor.</p></div><a className="am-back-link" href="?panel=actividades">← Mis actividades</a></div>
       {notice&&<p className="am-notice" role="status">{notice}</p>}
-      <section className="am-create" id="crear"><div><h2>Crear actividad</h2><p>Al elegir una plantilla disponible, se abre su editor directamente.</p></div><div className="am-template-grid">{available.map(template=><a key={template.id} className="am-template-card" href={editorUrl(undefined,template.id)}><span>{template.id==="pairs"?"↔":"◎"}</span><b>{template.title}</b><small>{template.description}</small><strong>Crear actividad →</strong></a>)}</div>
+            <section className="am-create" id="crear"><div><h2>Crear actividad</h2><p>Al elegir una plantilla disponible, se abre su editor directamente.</p></div><div className="am-template-grid">{available.map(template=><a key={template.id} className="am-template-card" href={editorUrl(undefined,template.id)}><span>{template.id==="pairs"?"↔":"◎"}</span><b>{template.title}</b><small>{template.description}</small><strong>Crear actividad →</strong></a>)}</div>
       <details className="am-planned"><summary>Plantillas en preparación ({planned.length + templateRegistry.filter(template => template.status === "ready" && !supportedKinds.includes(template.id === "diagram-labels" ? "diagram" : template.id)).length})</summary><div>{[...planned,...templateRegistry.filter(template => template.status === "ready" && !supportedKinds.includes(template.id === "diagram-labels" ? "diagram" : template.id))].map(template=><span key={template.id}>{template.title}</span>)}</div></details></section>
-      <section className="am-list"><div className="am-list-heading"><div><span className="am-kicker">GUARDADAS EN TU HOJA</span><h2>Actividades</h2></div><span>{activities.length} {activities.length===1?"actividad":"actividades"}</span></div>
-        {!activities.length?<div className="am-empty">Todavía no hay actividades guardadas. Crea una con los botones de arriba.</div>:<div className="am-activity-grid">{activities.map(activity=>{const definition=templateRegistry.find(item=>item.id===(activity.kind==="diagram"||!activity.kind?"diagram-labels":activity.kind));return <article className="am-activity-card" key={activity.id}><div className="am-card-top"><span>{definition?.title||"Actividad"}</span><button aria-label={"Compartir "+activity.title} onClick={()=>void share(activity)}>{copied===activity.id?"Enlace copiado ✓":"Compartir ↗"}</button></div><h3>{activity.title}</h3><p>{activity.kind==="pairs"||activity.kind==="memory"||activity.kind==="flashcards"?((activity.pairs||[]).length+(activity.kind==="memory"?" parejas":" tarjetas")):["quiz","quiz-show","true-false"].includes(activity.kind||"")?((activity.questions||[]).length+" preguntas"):activity.kind==="group-sort"?((activity.items||[]).length+" elementos"):activity.kind==="sequence"?((activity.steps||[]).length+" pasos"):(activity.kind==="complete-sentence"||activity.kind==="complete-phrase")?((activity.sentences||[]).length+" frases"):activity.kind==="word-order"?((activity.wordSentences||[]).length+" oraciones"):activity.kind==="roulette"?((activity.wheelEntries||[]).length+" retos"):activity.kind==="word-search"?((activity.wordSearchWords||[]).length+" palabras"):((activity.labels||[]).length+" etiquetas")}</p><div className="am-card-actions"><a href={editorUrl(activity)}>Editar</a><button onClick={()=>void duplicate(activity)} disabled={busy}>Duplicar</button>{activity.kind==="pairs"&&supportedKinds.includes("memory")&&<button onClick={()=>void convert(activity,"memory")} disabled={busy}>Crear como memorama</button>}{activity.kind==="pairs"&&supportedKinds.includes("flashcards")&&<button onClick={()=>void convert(activity,"flashcards")} disabled={busy}>Crear como tarjetas</button>}<button className="am-archive" onClick={()=>void archive(activity)} disabled={busy}>Eliminar</button></div></article>})}</div>}
+      </> : <>
+      <div className="am-heading"><div><span className="am-kicker">TU ESPACIO DE TRABAJO</span><h1>Mis actividades</h1><p>Abre, edita y comparte las actividades que has creado.</p></div><div className="am-heading-actions"><button className="am-refresh" onClick={()=>void refresh()} disabled={busy}>Actualizar lista</button><a className="am-primary" href="?panel=actividades&seccion=crear">＋ Crear actividad</a></div></div>
+      {notice&&<p className="am-notice" role="status">{notice}</p>}
+            <section className="am-list"><div className="am-list-heading"><div><span className="am-kicker">GUARDADAS EN TU HOJA</span><h2>Actividades</h2></div><span>{activities.length} {activities.length===1?"actividad":"actividades"}</span></div>
+        {!activities.length?<div className="am-empty">Todavía no hay actividades guardadas. Usa «Crear actividad» para elegir un juego.</div>:<div className="am-activity-grid">{activities.map(activity=>{const definition=templateRegistry.find(item=>item.id===(activity.kind==="diagram"||!activity.kind?"diagram-labels":activity.kind));return <article className="am-activity-card" key={activity.id}><div className="am-card-top"><span>{definition?.title||"Actividad"}</span><button aria-label={"Compartir "+activity.title} onClick={()=>void share(activity)}>{copied===activity.id?"Enlace copiado ✓":"Compartir ↗"}</button></div><h3>{activity.title}</h3><p>{activity.kind==="pairs"||activity.kind==="memory"||activity.kind==="flashcards"?((activity.pairs||[]).length+(activity.kind==="memory"?" parejas":" tarjetas")):["quiz","quiz-show","true-false"].includes(activity.kind||"")?((activity.questions||[]).length+" preguntas"):activity.kind==="group-sort"?((activity.items||[]).length+" elementos"):activity.kind==="sequence"?((activity.steps||[]).length+" pasos"):(activity.kind==="complete-sentence"||activity.kind==="complete-phrase")?((activity.sentences||[]).length+" frases"):activity.kind==="word-order"?((activity.wordSentences||[]).length+" oraciones"):activity.kind==="roulette"?((activity.wheelEntries||[]).length+" retos"):activity.kind==="word-search"?((activity.wordSearchWords||[]).length+" palabras"):((activity.labels||[]).length+" etiquetas")}</p><div className="am-card-actions"><a href={editorUrl(activity)}>Editar</a><button onClick={()=>void duplicate(activity)} disabled={busy}>Duplicar</button>{activity.kind==="pairs"&&supportedKinds.includes("memory")&&<button onClick={()=>void convert(activity,"memory")} disabled={busy}>Crear como memorama</button>}{activity.kind==="pairs"&&supportedKinds.includes("flashcards")&&<button onClick={()=>void convert(activity,"flashcards")} disabled={busy}>Crear como tarjetas</button>}<button className="am-archive" onClick={()=>void archive(activity)} disabled={busy}>Eliminar</button></div></article>})}</div>}
         <p className="am-footnote">Eliminar archiva la actividad de esta lista. Los resultados anteriores se conservan.</p>
       </section>
       </>}

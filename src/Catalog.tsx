@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { templateRegistry } from "./template-registry";
-import { apiRequest } from "./gas-client";
+import { apiRequest, forgetTeacherKey, getTeacherKey } from "./gas-client";
 
 export default function Catalog() {
   const [search, setSearch] = useState("");
@@ -9,7 +9,7 @@ export default function Catalog() {
   const [accountOpen, setAccountOpen] = useState(false);
 
   useEffect(() => {
-    setTeacher(Boolean(sessionStorage.getItem("platformTeacherKey")));
+    setTeacher(Boolean(getTeacherKey()));
     let live = true;
     void apiRequest("/api/capabilities").then(async response => {
       const data = await response.json();
@@ -23,7 +23,7 @@ export default function Catalog() {
       .toLocaleLowerCase("es-MX").includes(search.trim().toLocaleLowerCase("es-MX"))), [search]);
 
   function signOut() {
-    ["platformTeacherKey", "pairTeacherKey", "diagramTeacherKey"].forEach(key => sessionStorage.removeItem(key));
+    forgetTeacherKey();
     setTeacher(false);
     setAccountOpen(false);
   }
@@ -66,3 +66,4 @@ export default function Catalog() {
     </div>
   </main>;
 }
+
