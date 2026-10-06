@@ -34,6 +34,7 @@ export default function Catalog() {
       <nav className="catalog-nav" aria-label="Navegación principal">
         <a href="?panel=actividades">Mis actividades</a>
         <a href="?panel=resultados">Mis resultados</a>
+        <a href="?panel=alumno">Portal del alumno</a>
         <a className="catalog-create-link" href="?panel=actividades&seccion=crear">Crear actividad <span aria-hidden="true">＋</span></a>
         <div className="catalog-account">
           <button type="button" aria-expanded={accountOpen} onClick={() => setAccountOpen(open => !open)}>{teacher ? "Docente" : "Cuenta"}<span aria-hidden="true">⌄</span></button>
@@ -66,4 +67,3 @@ export default function Catalog() {
     </div>
   </main>;
 }
-
