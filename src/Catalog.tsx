@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { defaultActivity } from "./default-activity";
 import { templateRegistry } from "./template-registry";
 import { apiRequest } from "./gas-client";
