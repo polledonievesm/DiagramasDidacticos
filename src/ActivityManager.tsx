@@ -63,6 +63,12 @@ function sameStudent(result: Record<string, unknown>, student: StudentRow) {
 function isUnauthorized(error: unknown) {
   return typeof error === "object" && error !== null && "status" in error && Number((error as { status: unknown }).status) === 401;
 }
+function localDateTime(value?: string | null) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return "";
+  return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+}
 
 export default function ActivityManager() {
   const query = new URLSearchParams(window.location.search);
@@ -82,6 +88,8 @@ export default function ActivityManager() {
   const [reportActivityId, setReportActivityId] = useState(query.get("actividad") || "");
   const [accountOpen, setAccountOpen] = useState(false);
   const [supportedKinds, setSupportedKinds] = useState<string[]>(() => initialCache?.supportedKinds || ["diagram","pairs"]);
+  const [deadlineValues, setDeadlineValues] = useState<Record<string, string>>({});
+  const [savingDeadline, setSavingDeadline] = useState("");
 
   async function loadActivities(accessKey: string) {
     const headers = { "x-teacher-key": accessKey };
@@ -223,6 +231,23 @@ export default function ActivityManager() {
     }
   }
 
+  async function saveDeadline(activity: Activity) {
+    const localValue = deadlineValues[activity.id] ?? localDateTime(activity.availableUntil);
+    const availableUntil = localValue ? new Date(localValue).toISOString() : null;
+    setSavingDeadline(activity.id); setNotice("");
+    try {
+      const response = await apiRequest("/api/teacher/activity-deadline", { method: "POST", headers: { "x-teacher-key": key }, body: JSON.stringify({ id: activity.id, availableUntil }) });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "No se pudo guardar la fecha límite.");
+      const updated = activities.map(item => item.id === activity.id ? { ...item, availableUntil: data.availableUntil ?? null } : item);
+      setActivities(updated);
+      sessionStorage.setItem(PANEL_CACHE_KEY, JSON.stringify({ savedAt: Date.now(), activities: updated, supportedKinds }));
+      setDeadlineValues(old => ({ ...old, [activity.id]: localDateTime(data.availableUntil) }));
+      setNotice(availableUntil ? "Se guardó la fecha de cierre." : "La actividad quedó sin fecha de cierre.");
+    } catch (error) { setNotice(error instanceof Error ? error.message : "No se pudo guardar la fecha límite."); }
+    finally { setSavingDeadline(""); }
+  }
+
   if (!ready && key) return <main className="activity-manager-page"><header className="am-header"><a href="./">Aula en juego</a><span>Panel del maestro</span></header><section className="am-login"><span className="am-kicker">SESIÓN DOCENTE</span><h1>{notice ? "No se pudo cargar el panel" : "Cargando tus actividades…"}</h1><p>{notice || "Estamos conectando con tu hoja privada. No necesitas volver a escribir la clave."}</p>{notice&&<p className="am-notice" role="status">{notice}</p>}<button className="am-primary" disabled={busy} onClick={()=>{setBusy(true);setNotice("");void loadActivities(key).catch(handlePanelError).finally(()=>setBusy(false));}}>{busy?"Conectando…":"Reintentar"}</button><button className="am-secondary-button" onClick={()=>{forgetTeacherKey();setKey("");setDraftKey("");}}>Cerrar sesión</button></section></main>;
   if (!ready) return <main className="activity-manager-page"><header className="am-header"><a href="./">Aula en juego</a><span>Panel del maestro</span></header><form className="am-login" onSubmit={enter}><span className="am-kicker">ESPACIO DOCENTE</span><h1>Mis actividades</h1><p>Administra tus juegos y comparte el enlace con tus alumnos.</p><label>Clave del maestro<input autoComplete="current-password" type="password" required value={draftKey} onChange={event => setDraftKey(event.target.value)}/></label>{notice&&<p className="am-notice">{notice}</p>}<button className="am-primary" disabled={busy}>{busy?"Conectando…":"Entrar al panel"}</button><a href="./">Volver al inicio</a></form></main>;
 
@@ -230,7 +255,7 @@ export default function ActivityManager() {
   const planned = templateRegistry.filter(template => template.status !== "ready");
 
   return <main className="activity-manager-page">
-    <header className="am-header"><a href="./"><span className="am-logo">A</span>Aula en juego</a><nav className="am-top-nav"><a className={view === "activities" ? "active" : ""} href="?panel=actividades">Mis actividades</a><a className={view === "results" ? "active" : ""} href="?panel=resultados">Mis resultados</a><a className={`am-nav-create ${section === "create" ? "active" : ""}`} href="?panel=actividades&seccion=crear">Crear actividad</a><div className="am-account"><button aria-expanded={accountOpen} onClick={() => setAccountOpen(open => !open)}>Docente <span aria-hidden="true">⌄</span></button>{accountOpen&&<div className="am-account-menu"><strong>Sesión docente</strong><button onClick={()=>{forgetTeacherKey();setKey("");setReady(false);setDraftKey("");setAccountOpen(false);}}>Cerrar sesión</button></div>}</div></nav></header>
+    <header className="am-header"><a href="./"><span className="am-logo">A</span>Aula en juego</a><nav className="am-top-nav"><a className={view === "activities" ? "active" : ""} href="?panel=actividades">Mis actividades</a><a className={view === "results" ? "active" : ""} href="?panel=resultados">Mis resultados</a><a href="?modo=maestro&tab=students">Alumnos</a><a href="?panel=alumno">Ver portal del alumno</a><a className={`am-nav-create ${section === "create" ? "active" : ""}`} href="?panel=actividades&seccion=crear">Crear actividad</a><div className="am-account"><button aria-expanded={accountOpen} onClick={() => setAccountOpen(open => !open)}>Docente <span aria-hidden="true">⌄</span></button>{accountOpen&&<div className="am-account-menu"><strong>Sesión docente</strong><button onClick={()=>{forgetTeacherKey();setKey("");setReady(false);setDraftKey("");setAccountOpen(false);}}>Cerrar sesión</button></div>}</div></nav></header>
     <section className="am-main">
       {view === "results" ? <section className="am-list am-results-panel">
         <div className="am-list-heading"><div><span className="am-kicker">REGISTRO DEL GRUPO</span><h1>Mis resultados</h1><p>Consulta el avance de cada alumno por actividad.</p></div><button className="am-refresh" onClick={()=>void refresh()} disabled={busy}>Actualizar resultados</button></div>
@@ -245,8 +270,8 @@ export default function ActivityManager() {
       </> : <>
       <div className="am-heading"><div><span className="am-kicker">TU ESPACIO DE TRABAJO</span><h1>Mis actividades</h1><p>Abre, edita y comparte las actividades que has creado.</p></div><div className="am-heading-actions"><button className="am-refresh" onClick={()=>void refresh()} disabled={busy}>Actualizar lista</button><a className="am-primary" href="?panel=actividades&seccion=crear">＋ Crear actividad</a></div></div>
       {notice&&<p className="am-notice" role="status">{notice}</p>}
-            <section className="am-list"><div className="am-list-heading"><div><span className="am-kicker">GUARDADAS EN TU HOJA</span><h2>Actividades</h2></div><span>{activities.length} {activities.length===1?"actividad":"actividades"}</span></div>
-        {!activities.length?<div className="am-empty">Todavía no hay actividades guardadas. Usa «Crear actividad» para elegir un juego.</div>:<div className="am-activity-grid">{activities.map(activity=>{const definition=templateRegistry.find(item=>item.id===(activity.kind==="diagram"||!activity.kind?"diagram-labels":activity.kind));return <article className="am-activity-card" key={activity.id}><div className="am-card-top"><span>{definition?.title||"Actividad"}</span><button aria-label={"Compartir "+activity.title} onClick={()=>void share(activity)}>{copied===activity.id?"Enlace copiado ✓":"Compartir ↗"}</button></div><h3>{activity.title}</h3><p>{activity.kind==="pairs"||activity.kind==="memory"||activity.kind==="flashcards"?((activity.pairs||[]).length+(activity.kind==="memory"?" parejas":" tarjetas")):["quiz","quiz-show","true-false"].includes(activity.kind||"")?((activity.questions||[]).length+" preguntas"):activity.kind==="group-sort"?((activity.items||[]).length+" elementos"):activity.kind==="sequence"?((activity.steps||[]).length+" pasos"):(activity.kind==="complete-sentence"||activity.kind==="complete-phrase")?((activity.sentences||[]).length+" frases"):activity.kind==="word-order"?((activity.wordSentences||[]).length+" oraciones"):activity.kind==="roulette"?((activity.wheelEntries||[]).length+" retos"):activity.kind==="word-search"?((activity.wordSearchWords||[]).length+" palabras"):((activity.labels||[]).length+" etiquetas")}</p><div className="am-card-actions"><a href={editorUrl(activity)}>Editar</a><a href={"?panel=resultados&actividad="+encodeURIComponent(activity.id)}>Reporte</a><button onClick={()=>void duplicate(activity)} disabled={busy}>Duplicar</button>{activity.kind==="pairs"&&supportedKinds.includes("memory")&&<button onClick={()=>void convert(activity,"memory")} disabled={busy}>Crear como memorama</button>}{activity.kind==="pairs"&&supportedKinds.includes("flashcards")&&<button onClick={()=>void convert(activity,"flashcards")} disabled={busy}>Crear como tarjetas</button>}<button className="am-archive" onClick={()=>void archive(activity)} disabled={busy}>Eliminar</button></div></article>})}</div>}
+            <section className="am-list"><div className="am-list-heading"><div><span className="am-kicker">GUARDADAS EN TU HOJA</span><h2>Actividades</h2><p>Configura cuándo deja de estar disponible cada actividad.</p></div><span>{activities.length} {activities.length===1?"actividad":"actividades"}</span></div>
+        {!activities.length?<div className="am-empty">Todavía no hay actividades guardadas. Usa «Crear actividad» para elegir un juego.</div>:<div className="am-activity-grid">{activities.map(activity=>{const definition=templateRegistry.find(item=>item.id===(activity.kind==="diagram"||!activity.kind?"diagram-labels":activity.kind));return <article className="am-activity-card" key={activity.id}><div className="am-card-top"><span>{definition?.title||"Actividad"}</span><button aria-label={"Compartir "+activity.title} onClick={()=>void share(activity)}>{copied===activity.id?"Enlace copiado ✓":"Compartir ↗"}</button></div><h3>{activity.title}</h3><p>{activity.kind==="pairs"||activity.kind==="memory"||activity.kind==="flashcards"?((activity.pairs||[]).length+(activity.kind==="memory"?" parejas":" tarjetas")):["quiz","quiz-show","true-false"].includes(activity.kind||"")?((activity.questions||[]).length+" preguntas"):activity.kind==="group-sort"?((activity.items||[]).length+" elementos"):activity.kind==="sequence"?((activity.steps||[]).length+" pasos"):(activity.kind==="complete-sentence"||activity.kind==="complete-phrase")?((activity.sentences||[]).length+" frases"):activity.kind==="word-order"?((activity.wordSentences||[]).length+" oraciones"):activity.kind==="roulette"?((activity.wheelEntries||[]).length+" retos"):activity.kind==="word-search"?((activity.wordSearchWords||[]).length+" palabras"):((activity.labels||[]).length+" etiquetas")}</p><div className="am-deadline"><label>Disponible hasta<input type="datetime-local" value={deadlineValues[activity.id] ?? localDateTime(activity.availableUntil)} onChange={event=>setDeadlineValues(old=>({...old,[activity.id]:event.target.value}))}/></label><button onClick={()=>void saveDeadline(activity)} disabled={savingDeadline===activity.id}>{savingDeadline===activity.id?"Guardando…":"Guardar fecha"}</button><small>{activity.availableUntil?`Cierra ${new Date(activity.availableUntil).toLocaleString("es-MX")}`:"Sin fecha de cierre"}</small></div><div className="am-card-actions"><a href={editorUrl(activity)}>Editar</a><a href={"?panel=resultados&actividad="+encodeURIComponent(activity.id)}>Reporte</a><button onClick={()=>void duplicate(activity)} disabled={busy}>Duplicar</button>{activity.kind==="pairs"&&supportedKinds.includes("memory")&&<button onClick={()=>void convert(activity,"memory")} disabled={busy}>Crear como memorama</button>}{activity.kind==="pairs"&&supportedKinds.includes("flashcards")&&<button onClick={()=>void convert(activity,"flashcards")} disabled={busy}>Crear como tarjetas</button>}<button className="am-archive" onClick={()=>void archive(activity)} disabled={busy}>Eliminar</button></div></article>})}</div>}
         <p className="am-footnote">Eliminar archiva la actividad de esta lista. Los resultados anteriores se conservan.</p>
       </section>
       </>}
