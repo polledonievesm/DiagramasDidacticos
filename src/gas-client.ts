@@ -81,7 +81,7 @@ export async function apiRequest(path: string, init: RequestInit = {}) {
     const key = new Headers(init.headers).get("x-teacher-key") || "";
     const data = await jsonp<Activity[] | ApiResult>({ action: "activities", key });
     if (!Array.isArray(data)) return response(data as ApiResult, 401);
-    cachedActivities = new Map(data.map((item) => [item.id, item]));
+    data.forEach((item) => cachedActivities.set(item.id, item));
     const pairsOnly = url.searchParams.get("tipo") === "pairs";
     return response((pairsOnly ? data.filter((item) => item.kind === "pairs") : data.filter((item) => item.kind !== "pairs")) as unknown as ApiResult);
   }
@@ -166,6 +166,18 @@ export async function apiRequest(path: string, init: RequestInit = {}) {
     cachedActivity = activity;
     cachedActivities.set(activity.id, activity);
     return response(activity as unknown as ApiResult);
+  }
+  if (method === "POST" && url.pathname.endsWith("/api/teacher/activity-archive")) {
+    const key = new Headers(init.headers).get("x-teacher-key") || "";
+    const id = String(body.id || "");
+    if (!id) return response({ error: "Falta el identificador de la actividad." }, 400);
+    await send({ action: "archiveActivity", key, id });
+    const data = await jsonp<Activity[] | ApiResult>({ action: "activities", key });
+    if (!Array.isArray(data)) return response(data as ApiResult, 401);
+    if (data.some((activity) => activity.id === id)) return response({ error: "No se pudo verificar el archivo de la actividad." }, 503);
+    cachedActivities.delete(id);
+    if (cachedActivity?.id === id) cachedActivity = null;
+    return response({ ok: true, id });
   }
   return response({ error: "Operación no reconocida." }, 404);
 }
