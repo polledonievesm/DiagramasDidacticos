@@ -227,10 +227,11 @@ export default function Home() {
     try {
       const response = await apiRequest("/api/teacher/activities", { headers }); const data = await response.json();
       if (!response.ok) throw new Error(data.error || "No se pudo verificar el acceso.");
-      setTeacherKey(accessKey); setKeyDraft(accessKey); sessionStorage.setItem("diagramTeacherKey", accessKey); setTeacherUnlocked(true); setActivities(data);
+      const diagramActivities = (data as Activity[]).filter((item) => !item.kind || item.kind === "diagram");
+      setTeacherKey(accessKey); setKeyDraft(accessKey); sessionStorage.setItem("diagramTeacherKey", accessKey); setTeacherUnlocked(true); setActivities(diagramActivities);
       const query = new URLSearchParams(window.location.search);
       if (query.get("nueva") === "1") addNewActivity();
-      else { const selectedId = query.get("actividad"); setEditing(data.find((a: Activity) => a.id === (selectedId || activity.id)) || activity); }
+      else { const selectedId = query.get("actividad"); setEditing(diagramActivities.find((a) => a.id === (selectedId || activity.id)) || activity); }
       await loadResults(accessKey);
     } catch (e) { setNotice(e instanceof Error ? e.message : "Revisa la clave del maestro."); }
   }

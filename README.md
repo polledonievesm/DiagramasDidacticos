@@ -14,43 +14,38 @@ npm install
 npm run dev
 ```
 
-Vite muestra la dirección local. Los cambios de interfaz aparecen al guardar archivos. Para verificar antes de publicar:
+Vite muestra la dirección local. Los cambios de interfaz aparecen al guardar archivos. Verifica con:
 
 ```bash
 npm run build
 ```
 
-GitHub Actions ejecuta la compilación y publica los cambios que llegan a `main`.
+GitHub Actions compila y publica los cambios que llegan a `main`.
 
 ## Datos y Apps Script
 
-El proyecto conserva la hoja de cálculo y el despliegue de Apps Script ya conectados. **No vuelvas a ejecutar `setupMigration` ni crees otra hoja.** La URL del servicio se configura en `public/config.js`; no agregues contraseñas, PIN del maestro ni datos de estudiantes al repositorio.
+El proyecto conserva la hoja de cálculo y el despliegue de Apps Script existentes. **No vuelvas a ejecutar `setupMigration` ni crees otra hoja.** La URL del servicio está en `public/config.js`; no agregues contraseñas, PIN del maestro ni datos de estudiantes al repositorio.
 
-Cuando un cambio de la plataforma incluya `apps-script/Code.gs`, copia su contenido al proyecto de Apps Script existente y crea una nueva versión desde **Implementar → Administrar implementaciones → Editar → Nueva versión → Implementar**. La URL `/exec` debe seguir siendo la misma. Los cambios de interfaz por sí solos no requieren actualizar Apps Script.
+Para activar plantillas nuevas después de integrar cambios que modifican `apps-script/Code.gs`, copia ese archivo al proyecto de Apps Script existente y crea una nueva versión desde **Implementar → Administrar implementaciones → Editar → Nueva versión → Implementar**. Conserva la URL `/exec`. El catálogo consulta las capacidades del servicio y oculta los juegos que todavía no puede guardar.
 
-Las eliminaciones del panel son archivos lógicos: ocultan una actividad y bloquean su enlace, pero conservan sus participaciones en la hoja de resultados.
+Las eliminaciones del panel archivan las actividades. Los resultados históricos permanecen en la hoja.
 
-## Estado de plantillas
+## Plantillas conectadas al Apps Script de esta etapa
 
-Operativas y conectadas al guardado actual:
+- **Diagrama con etiquetas**: imagen, chinchetas, hasta diez etiquetas, tiempo, intentos y calificación.
+- **Une su pareja**: texto e imágenes, arrastrar o tocar para unir parejas.
+- **Cuestionario**: preguntas, opciones e imágenes opcionales.
+- **Clasificar en grupos**: elementos con texto o imágenes asignados a grupos.
+- **Ordenar secuencias**: reordenar pasos, con controles aptos para celular.
+- **Completar oraciones**: respuestas de texto e imágenes opcionales.
+- **Ordenar palabras**: reorganizar palabras para construir oraciones.
+- **Tarjetas**: dos caras de texto o imagen.
+- **Memorama**: encontrar parejas con tarjetas.
+- **Ruleta**: seleccionar retos de forma aleatoria; registra los retos marcados como completados.
+- **Sopa de letras**: cuadrícula aleatoria con palabras horizontales, verticales y diagonales.
 
-- **Diagrama con etiquetas**: imagen, puntos, hasta diez etiquetas, tiempo, intentos, clasificación y resultados.
-- **Une su pareja**: texto e imágenes en cada lado, contenido de parejas, opciones de juego y resultados.
+Las plantillas comparten la hoja de actividades/resultados, autenticación de alumnos, intentos y configuración de tiempo. Una actividad de parejas puede crear una copia como tarjetas o memorama cuando su contenido encaja; se conserva la actividad original.
 
-En preparación; aún no deben usarse con alumnos:
+## Publicación y datos
 
-- Cuestionario
-- Clasificar en grupos
-- Ordenar secuencias
-- Completar oraciones
-- Ordenar palabras
-- Tarjetas
-- Ruleta
-- Memorama
-- Sopa de letras
-
-El registro compartido de plantillas describe qué contenido y opciones admite cada juego. La conversión automática solo se ofrecerá cuando el juego de destino ya pueda editar, jugar y guardar ese contenido.
-
-## Almacenamiento
-
-Apps Script conserva las actividades y los resultados en la hoja existente, además de cuentas y resultados históricos. Drive guarda las imágenes que suba el maestro. No publiques la hoja ni exportes datos personales al repositorio.
+GitHub Pages aloja la interfaz estática. Sheets y Drive permanecen privados/configurados en el proyecto Apps Script existente. No publiques hojas de resultados, contraseñas ni datos personales.
