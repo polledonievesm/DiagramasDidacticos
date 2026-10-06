@@ -34,6 +34,7 @@ export default function ActivityManager() {
   const [notice, setNotice] = useState("");
   const [ready, setReady] = useState(false);
   const [copied, setCopied] = useState("");
+  const [supportedKinds, setSupportedKinds] = useState<string[]>(["diagram","pairs"]);
 
   async function loadActivities(accessKey: string) {
     const headers = { "x-teacher-key": accessKey };
@@ -45,6 +46,9 @@ export default function ActivityManager() {
     if (!diagrams.ok || !Array.isArray(diagramData)) throw new Error(diagramData.error || "No se pudo validar la clave del maestro.");
     if (!pairs.ok || !Array.isArray(pairData)) throw new Error(pairData.error || "No se pudieron cargar las actividades de parejas.");
     setActivities([...pairData, ...diagramData].sort((a, b) => a.title.localeCompare(b.title, "es-MX")));
+    const capsResponse = await apiRequest("/api/capabilities");
+    const caps = await capsResponse.json();
+    setSupportedKinds(capsResponse.ok && Array.isArray(caps.kinds) ? caps.kinds : ["diagram","pairs"]);
     setReady(true);
   }
 
@@ -114,7 +118,7 @@ export default function ActivityManager() {
 
   if (!ready) return <main className="activity-manager-page"><header className="am-header"><a href="./">Aula en juego</a><span>Panel del maestro</span></header><form className="am-login" onSubmit={enter}><span className="am-kicker">ESPACIO DOCENTE</span><h1>Mis actividades</h1><p>Administra tus juegos y comparte el enlace con tus alumnos.</p><label>Clave del maestro<input autoComplete="current-password" type="password" required value={draftKey} onChange={event => setDraftKey(event.target.value)}/></label>{notice&&<p className="am-notice">{notice}</p>}<button className="am-primary" disabled={busy}>{busy?"Conectando…":"Entrar al panel"}</button><a href="./">Volver al inicio</a></form></main>;
 
-  const available = templateRegistry.filter(template => template.status === "ready");
+  const available = templateRegistry.filter(template => template.status === "ready" && supportedKinds.includes(template.id === "diagram-labels" ? "diagram" : template.id));
   const planned = templateRegistry.filter(template => template.status !== "ready");
 
   return <main className="activity-manager-page">
@@ -123,7 +127,7 @@ export default function ActivityManager() {
       <div className="am-heading"><div><span className="am-kicker">TU ESPACIO DE TRABAJO</span><h1>Mis actividades</h1><p>Crea, organiza y comparte actividades para tu grupo.</p></div><button className="am-refresh" onClick={()=>void refresh()} disabled={busy}>Actualizar lista</button></div>
       {notice&&<p className="am-notice" role="status">{notice}</p>}
       <section className="am-create"><div><h2>Crear actividad</h2><p>Al elegir una plantilla disponible, se abre su editor directamente.</p></div><div className="am-template-grid">{available.map(template=><a key={template.id} className="am-template-card" href={editorUrl(undefined,template.id)}><span>{template.id==="pairs"?"↔":"◎"}</span><b>{template.title}</b><small>{template.description}</small><strong>Crear actividad →</strong></a>)}</div>
-      <details className="am-planned"><summary>Plantillas en preparación ({planned.length})</summary><div>{planned.map(template=><span key={template.id}>{template.title}</span>)}</div></details></section>
+      <details className="am-planned"><summary>Plantillas en preparación ({planned.length + templateRegistry.filter(template => template.status === "ready" && !supportedKinds.includes(template.id === "diagram-labels" ? "diagram" : template.id)).length})</summary><div>{[...planned,...templateRegistry.filter(template => template.status === "ready" && !supportedKinds.includes(template.id === "diagram-labels" ? "diagram" : template.id))].map(template=><span key={template.id}>{template.title}</span>)}</div></details></section>
       <section className="am-list"><div className="am-list-heading"><div><span className="am-kicker">GUARDADAS EN TU HOJA</span><h2>Actividades</h2></div><span>{activities.length} {activities.length===1?"actividad":"actividades"}</span></div>
         {!activities.length?<div className="am-empty">Todavía no hay actividades guardadas. Crea una con los botones de arriba.</div>:<div className="am-activity-grid">{activities.map(activity=>{const definition=templateRegistry.find(item=>item.id===(activity.kind==="diagram"||!activity.kind?"diagram-labels":activity.kind));return <article className="am-activity-card" key={activity.id}><div className="am-card-top"><span>{definition?.title||"Actividad"}</span><button aria-label={"Compartir "+activity.title} onClick={()=>void share(activity)}>{copied===activity.id?"Enlace copiado ✓":"Compartir ↗"}</button></div><h3>{activity.title}</h3><p>{activity.kind==="pairs"||activity.kind==="memory"||activity.kind==="flashcards"?((activity.pairs||[]).length+(activity.kind==="memory"?" parejas":" tarjetas")):activity.kind==="quiz"?((activity.questions||[]).length+" preguntas"):activity.kind==="group-sort"?((activity.items||[]).length+" elementos"):activity.kind==="sequence"?((activity.steps||[]).length+" pasos"):activity.kind==="complete-sentence"?((activity.sentences||[]).length+" oraciones"):activity.kind==="word-order"?((activity.wordSentences||[]).length+" oraciones"):((activity.labels||[]).length+" etiquetas")}</p><div className="am-card-actions"><a href={editorUrl(activity)}>Editar</a><button onClick={()=>void duplicate(activity)} disabled={busy}>Duplicar</button><button className="am-archive" onClick={()=>void archive(activity)} disabled={busy}>Eliminar</button></div></article>})}</div>}
         <p className="am-footnote">Eliminar archiva la actividad de esta lista. Los resultados anteriores se conservan.</p>
