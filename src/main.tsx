@@ -7,6 +7,7 @@ import TemplateGame from "./TemplateGame";
 import CardGame from "./CardGame";
 import TextGame from "./TextGame";
 import ExtraGame from "./ExtraGame";
+import StudentPortal from "./StudentPortal";
 import "./globals.css";
 
 const query=new URLSearchParams(window.location.search);
@@ -18,6 +19,6 @@ const extraGames=["roulette","word-search","complete-phrase"].includes(game);
 
 createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    {["actividades","resultados"].includes(query.get("panel")||"") ? <ActivityManager /> : game==="parejas" ? <PairGame /> : generic ? <TemplateGame kind={game as "quiz"|"quiz-show"|"true-false"|"group-sort"|"sequence"} /> : cards ? <CardGame kind={game as "flashcards"|"memory"} /> : textGames ? <TextGame kind={game as "complete-sentence"|"word-order"} /> : extraGames ? <ExtraGame kind={game as "roulette"|"word-search"|"complete-phrase"} /> : <App />}
+    {query.get("panel")==="alumno" ? <StudentPortal /> : ["actividades","resultados","alumnos"].includes(query.get("panel")||"") ? <ActivityManager /> : game==="parejas" ? <PairGame /> : generic ? <TemplateGame kind={game as "quiz"|"quiz-show"|"true-false"|"group-sort"|"sequence"} /> : cards ? <CardGame kind={game as "flashcards"|"memory"} /> : textGames ? <TextGame kind={game as "complete-sentence"|"word-order"} /> : extraGames ? <ExtraGame kind={game as "roulette"|"word-search"|"complete-phrase"} /> : <App />}
   </React.StrictMode>,
 );
