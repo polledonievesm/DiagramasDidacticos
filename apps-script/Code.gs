@@ -414,7 +414,8 @@ function leaderboard_(activityId) {
   if (activity.error) return { error: 'No se encontró la actividad.' };
   const best = {}, counts = {};
   listResults_().filter(function(row) { return row.activity_id === activityId; }).forEach(function(row) {
-    const key = row.student_id || [normalizeStudent_(row.paternal_surname), normalizeStudent_(row.maternal_surname), normalizeStudent_(row.given_names)].join('|');
+    // Agrupa también los intentos antiguos que se guardaron antes de activar cuentas.
+    const key = [normalizeStudent_(row.paternal_surname), normalizeStudent_(row.maternal_surname), normalizeStudent_(row.given_names)].join('|');
     counts[key] = (counts[key] || 0) + 1;
     const previous = best[key];
     if (!previous || Number(row.grade) > Number(previous.grade) || (Number(row.grade) === Number(previous.grade) && Number(row.correct) > Number(previous.correct)) || (Number(row.grade) === Number(previous.grade) && Number(row.correct) === Number(previous.correct) && Number(row.elapsed_seconds) < Number(previous.elapsed_seconds))) best[key] = row;
@@ -431,7 +432,9 @@ function leaderboard_(activityId) {
 function studentPortal_(token) {
   const account = verifyStudentToken_(token);
   if (!account || !account.active) return { error: 'La sesión del alumno venció. Inicia sesión de nuevo.' };
-  const attempts = listResults_().filter(function(row) { return row.student_id === account.id; });
+  const attempts = listResults_().filter(function(row) {
+    return row.student_id === account.id || (!row.student_id && normalizeStudent_(row.paternal_surname) === normalizeStudent_(account.paternalSurname) && normalizeStudent_(row.maternal_surname) === normalizeStudent_(account.maternalSurname) && normalizeStudent_(row.given_names) === normalizeStudent_(account.givenNames));
+  });
   const deadlineMap = getDeadlineMap_();
   const activities = listActivities_().map(function(activity) {
     const dueAt = deadlineMap[activity.id] || '';
