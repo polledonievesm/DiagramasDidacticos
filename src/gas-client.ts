@@ -145,9 +145,10 @@ export async function apiRequest(path: string, init: RequestInit = {}) {
     else if (activity.kind === "sequence") {
       const submitted = Array.isArray(answers.order) ? answers.order.map(String) : [];
       correct = [...(activity.steps || [])].sort((a, b) => a.order - b.order).filter((step, index) => submitted[index] === step.id).length;
-    } else if (activity.kind === "pairs") correct = (activity.pairs || []).filter((pair) => matches[pair.id] === pair.id).length;
+    } else if (activity.kind === "flashcards" || activity.kind === "memory") correct = (activity.pairs || []).filter((pair) => answers[pair.id] === pair.id).length;
+    else if (activity.kind === "pairs") correct = (activity.pairs || []).filter((pair) => matches[pair.id] === pair.id).length;
     else correct = activity.labels.filter((label) => placements[label.id] === label.id).length;
-    const total = activity.kind === "pairs" ? (activity.pairs || []).length : activity.kind === "quiz" ? (activity.questions || []).length : activity.kind === "group-sort" ? (activity.items || []).length : activity.kind === "sequence" ? (activity.steps || []).length : activity.labels.length;
+    const total = activity.kind === "pairs" || activity.kind === "flashcards" || activity.kind === "memory" ? (activity.pairs || []).length : activity.kind === "quiz" ? (activity.questions || []).length : activity.kind === "group-sort" ? (activity.items || []).length : activity.kind === "sequence" ? (activity.steps || []).length : activity.labels.length;
     const elapsedSeconds = Number(body.elapsedSeconds) || 0;
     const result = {
       id: Date.now(), correct, total,
