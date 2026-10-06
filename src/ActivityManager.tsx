@@ -36,7 +36,11 @@ function readReportCache(): { savedAt: number; results: Record<string, unknown>[
   try {
     const value = JSON.parse(sessionStorage.getItem(REPORT_CACHE_KEY) || "null") as { savedAt?: number; results?: Record<string, unknown>[]; students?: StudentRow[] } | null;
     if (!value || typeof value.savedAt !== "number" || !Array.isArray(value.results) || !Array.isArray(value.students)) return null;
-    return value;
+    return {
+      savedAt: value.savedAt,
+      results: value.results as Record<string, unknown>[],
+      students: value.students as StudentRow[],
+    };
   } catch { return null; }
 }
 
