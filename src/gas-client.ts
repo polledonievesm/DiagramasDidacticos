@@ -81,7 +81,7 @@ export async function apiRequest(path: string, init: RequestInit = {}) {
     const key = new Headers(init.headers).get("x-teacher-key") || "";
     const data = await jsonp<Activity[] | ApiResult>({ action: "activities", key });
     if (!Array.isArray(data)) return response(data as ApiResult, 401);
-    cachedActivities = new Map(data.map((item) => [item.id, item]));
+    data.forEach((item) => cachedActivities.set(item.id, item));
     const pairsOnly = url.searchParams.get("tipo") === "pairs";
     return response((pairsOnly ? data.filter((item) => item.kind === "pairs") : data.filter((item) => item.kind !== "pairs")) as unknown as ApiResult);
   }
