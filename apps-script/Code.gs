@@ -211,7 +211,8 @@ function saveTemplateActivity_(body, id, title) {
       const text = String(sentence.text || '').trim().slice(0, 500);
       const words = text.split(/\\s+/).filter(Boolean);
       if (words.length < 2 || words.length > 50) throw new Error('Cada oración debe contener entre 2 y 50 palabras.');
-      return { id: sentenceId, text: text, words: words.map(function(word, index) { return { id: sentenceId + '-palabra-' + index, text: word, order: index }; }) };
+      const wordStyles = Array.isArray(sentence.wordStyles) ? sentence.wordStyles : [];
+      return { id: sentenceId, text: text, wordStyles: words.map(function(word, index) { const style = wordStyles[index] || {}; return { bold: style.bold === true, italic: style.italic === true, underline: style.underline === true }; }), words: words.map(function(word, index) { const style = wordStyles[index] || {}; return { id: sentenceId + '-palabra-' + index, text: word, order: index, bold: style.bold === true, italic: style.italic === true, underline: style.underline === true }; }) };
     });
   } else if (kind === 'flashcards' || kind === 'memory') {
     if (!Array.isArray(body.pairs) || body.pairs.length < 2 || body.pairs.length > 30) throw new Error('Agrega entre 2 y 30 tarjetas.');
