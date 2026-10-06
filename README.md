@@ -1,45 +1,56 @@
-# Migración de «Diagrama con etiquetas»
+# Aula en juego
 
-Esta carpeta prepara la aplicación para ejecutarse localmente con recarga instantánea y publicarse en GitHub Pages. Las actividades, las imágenes que suba el maestro y los resultados se guardan en una hoja privada de Google mediante Apps Script.
+Plataforma educativa publicada en GitHub Pages. Las actividades, imágenes y resultados usan la hoja privada de Google y el proyecto de Apps Script existentes.
 
-## 1. Configurar Google Sheets y Apps Script
+- Sitio: https://polledonievesm.github.io/DiagramasDidacticos/
+- Repositorio: https://github.com/polledonievesm/DiagramasDidacticos
 
-1. En [script.google.com](https://script.google.com/) crea un proyecto y reemplaza el contenido de `Code.gs` por `apps-script/Code.gs`.
-2. En el editor, ejecuta `setupMigration` una sola vez y acepta los permisos. En el registro de ejecución aparecerán el enlace privado de la hoja y la clave inicial del maestro. Guarda la clave.
-3. En **Implementar → Nueva implementación → Aplicación web**, selecciona **Ejecutar como: yo** y el acceso que permita a tus alumnos abrir el juego. Implementa y copia la URL que termina en `/exec`.
-4. Pega esa URL en `public/config.js`, en `window.GAS_WEB_APP_URL`. Ese archivo contiene sólo la dirección pública del servicio; no agregues contraseñas ni datos de alumnos.
+## Desarrollo local
 
-La hoja de cálculo sigue siendo privada. Las imágenes que el maestro agregue se guardan en una carpeta de Drive y se habilita su visualización mediante enlace para que aparezcan en el juego.
-
-## 2. Ver el sitio mientras se programa
-
-Desde esta carpeta ejecuta:
+Requiere Node.js 22 o posterior.
 
 ```bash
 npm install
 npm run dev
 ```
 
-Abre la dirección local que indique Vite (normalmente `http://localhost:5173`). Los cambios en la interfaz aparecen al guardar los archivos; no hace falta actualizar Apps Script para cada ajuste visual.
+Vite muestra la dirección local. Los cambios de interfaz aparecen al guardar archivos. Para verificar antes de publicar:
 
-## 3. Publicar
+```bash
+npm run build
+```
 
-Sube **el contenido de esta carpeta** a un repositorio de GitHub, en la rama `main`. En ese repositorio abre **Settings → Pages** y elige **GitHub Actions** como origen. El flujo incluido compila y publica cada vez que se actualiza `main`. La URL de alumnos tendrá el formato `https://USUARIO.github.io/REPOSITORIO/`.
+GitHub Actions ejecuta la compilación y publica los cambios que llegan a `main`.
 
-No subas la hoja de resultados, contraseñas ni datos personales al repositorio. El PIN del maestro se configura en las propiedades privadas del proyecto de Apps Script.
+## Datos y Apps Script
 
-## Funciones incluidas
+El proyecto conserva la hoja de cálculo y el despliegue de Apps Script ya conectados. **No vuelvas a ejecutar `setupMigration` ni crees otra hoja.** La URL del servicio se configura en `public/config.js`; no agregues contraseñas, PIN del maestro ni datos de estudiantes al repositorio.
 
-- El juego se llama **Diagrama con etiquetas** y mantiene la instrucción: “Arrastra y suelta las chinchetas en su lugar correcto de la imagen.”
-- El maestro puede subir primero la imagen, agregar hasta diez etiquetas de colores, arrastrar cada control de ubicación sobre la imagen y guardar los cambios cuando vuelva al panel.
-- Puede configurar cuenta regresiva o cronómetro, y permitir de 1 a 10 intentos o intentos ilimitados.
-- El alumno captura apellido paterno, apellido materno y nombre(s). Al terminar ve sus aciertos, calificación, tiempo, intentos restantes y la opción de volver a jugar cuando aún tenga intentos.
-- Hay una tabla de posiciones para un máximo de 35 alumnos, ordenada por aciertos y luego por menor tiempo. Muestra el nombre y apellido paterno; los primeros siete lugares tienen distintivos y los siguientes muestran su número.
-- Incluye sonidos, aleatorización de etiquetas, líneas sobre la imagen, registro de resultados en Sheets y descarga CSV para el maestro.
-- Las actividades se guardan en Sheets y las imágenes en Drive; el sitio estático se publica en GitHub Pages.
+Cuando un cambio de la plataforma incluya `apps-script/Code.gs`, copia su contenido al proyecto de Apps Script existente y crea una nueva versión desde **Implementar → Administrar implementaciones → Editar → Nueva versión → Implementar**. La URL `/exec` debe seguir siendo la misma. Los cambios de interfaz por sí solos no requieren actualizar Apps Script.
 
-## Nota para probar
+Las eliminaciones del panel son archivos lógicos: ocultan una actividad y bloquean su enlace, pero conservan sus participaciones en la hoja de resultados.
 
-Este ZIP contiene los cambios recientes de la aplicación, pero todavía debes configurar e implementar Apps Script y publicar el proyecto en tu cuenta de GitHub antes de compartir un nuevo enlace. La configuración `public/config.js` requiere la URL `/exec` de tu implementación. Conserva publicada la versión de ChatGPT Sites mientras pruebas la migración.
+## Estado de plantillas
 
-Los intentos y la tabla de posiciones se guardan en la hoja privada. La tabla pública muestra el nombre y apellido paterno solicitados. No publiques la hoja ni agregues datos personales al repositorio.
+Operativas y conectadas al guardado actual:
+
+- **Diagrama con etiquetas**: imagen, puntos, hasta diez etiquetas, tiempo, intentos, clasificación y resultados.
+- **Une su pareja**: texto e imágenes en cada lado, contenido de parejas, opciones de juego y resultados.
+
+En preparación; aún no deben usarse con alumnos:
+
+- Cuestionario
+- Clasificar en grupos
+- Ordenar secuencias
+- Completar oraciones
+- Ordenar palabras
+- Tarjetas
+- Ruleta
+- Memorama
+- Sopa de letras
+
+El registro compartido de plantillas describe qué contenido y opciones admite cada juego. La conversión automática solo se ofrecerá cuando el juego de destino ya pueda editar, jugar y guardar ese contenido.
+
+## Almacenamiento
+
+Apps Script conserva las actividades y los resultados en la hoja existente, además de cuentas y resultados históricos. Drive guarda las imágenes que suba el maestro. No publiques la hoja ni exportes datos personales al repositorio.
