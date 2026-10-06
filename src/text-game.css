@@ -10,6 +10,7 @@
 .tx-page textarea{box-sizing:border-box;width:100%;resize:vertical;min-height:76px;padding:12px;border:1px solid #d8e1dc;border-radius:11px;font:inherit;color:#263830;background:white;line-height:1.45}
 .tx-page textarea:focus{outline:2px solid #cce7d7;border-color:#6b9e7a}
 .tx-formatbar{display:flex;align-items:center;gap:6px;flex-wrap:wrap}.tx-formatbar button{display:grid;place-items:center;width:34px;height:32px;border:1px solid #d9e2dc;border-radius:7px;background:#fff;color:#344b3f;font-size:16px}.tx-formatbar button:hover{background:#edf5ef;border-color:#9fbea8}.tx-formatbar small{color:#738078;font-size:12px;font-weight:500;margin-left:4px}
+.tx-word-format-preview{display:flex;flex-wrap:wrap;gap:5px;padding:8px 10px;border:1px dashed #d7e2da;border-radius:8px;background:#fbfdfb;color:#30463a;font-weight:500}.tx-word-format-preview:empty{display:none}
 .tx-editor form{display:grid;gap:16px}
 .tx-editor section{border-top:1px solid #e7ece8;padding-top:17px}
 .tx-editor h2{font-size:20px;margin:0 0 12px}
