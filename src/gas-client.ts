@@ -58,6 +58,10 @@ export async function apiRequest(path: string, init: RequestInit = {}) {
     }
     return response(data as unknown as ApiResult, 404);
   }
+  if (method === "GET" && url.pathname.endsWith("/api/pair-activities")) {
+    const data = await jsonp<Activity[]>({ action: "pairActivities" });
+    return response(data as unknown as ApiResult);
+  }
   if (method === "GET" && url.pathname.endsWith("/api/attempts")) {
     const data = await jsonp<ApiResult>({
       action: "attempts",
@@ -78,7 +82,8 @@ export async function apiRequest(path: string, init: RequestInit = {}) {
     const data = await jsonp<Activity[] | ApiResult>({ action: "activities", key });
     if (!Array.isArray(data)) return response(data as ApiResult, 401);
     cachedActivities = new Map(data.map((item) => [item.id, item]));
-    return response(data as unknown as ApiResult);
+    const pairsOnly = url.searchParams.get("tipo") === "pairs";
+    return response((pairsOnly ? data.filter((item) => item.kind === "pairs") : data.filter((item) => item.kind !== "pairs")) as unknown as ApiResult);
   }
   if (method === "GET" && url.pathname.endsWith("/api/teacher/results")) {
     const key = new Headers(init.headers).get("x-teacher-key") || "";
@@ -132,8 +137,9 @@ export async function apiRequest(path: string, init: RequestInit = {}) {
     if ("error" in availability) return response(availability, 400);
     if (!availability.canStart) return response({ error: "Ya utilizaste todos tus intentos para esta actividad." }, 429);
     const placements = (body.placements || {}) as Record<string, string>;
-    const correct = activity.labels.filter((label) => placements[label.id] === label.id).length;
-    const total = activity.labels.length;
+    const matches = (body.matches || {}) as Record<string, string>;
+    const correct = activity.kind === "pairs" ? (activity.pairs || []).filter((pair) => matches[pair.id] === pair.id).length : activity.labels.filter((label) => placements[label.id] === label.id).length;
+    const total = activity.kind === "pairs" ? (activity.pairs || []).length : activity.labels.length;
     const elapsedSeconds = Number(body.elapsedSeconds) || 0;
     const result = {
       id: Date.now(), correct, total,

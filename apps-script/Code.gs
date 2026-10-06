@@ -69,6 +69,7 @@ function doPost(e) {
 function routeGet_(p) {
   const action = String(p.action || 'activity');
   if (action === 'activity') return getActivity_(String(p.id || 'digestivo-inicial'));
+  if (action === 'pairActivities') return listPairActivities_();
   if (action === 'loginResult') return loginResult_(String(p.requestId || ''));
   if (action === 'attempts') return attemptInfo_(String(p.activityId || 'digestivo-inicial'), p.paternalSurname, p.maternalSurname, p.givenNames, p.studentToken);
   if (action === 'leaderboard') return leaderboard_(String(p.activityId || 'digestivo-inicial'));
@@ -84,6 +85,7 @@ function saveActivity_(body) {
   const id = String(body.id || ('actividad-' + Utilities.getUuid())).slice(0, 100);
   const title = String(body.title || '').trim().slice(0, 120);
   if (!title) throw new Error('Escribe el título de la actividad.');
+  if (body.kind === 'pairs') return savePairActivity_(body, id, title);
   if (!Array.isArray(body.labels) || body.labels.length < 1 || body.labels.length > 10) throw new Error('La actividad requiere de 1 a 10 etiquetas.');
 
   const sheet = spreadsheet_().getSheetByName(TAB_ACTIVITIES);
@@ -125,6 +127,45 @@ function saveActivity_(body) {
   return activity;
 }
 
+function savePairActivity_(body, id, title) {
+  if (!Array.isArray(body.pairs) || body.pairs.length < 2 || body.pairs.length > 10) throw new Error('Agrega entre 2 y 10 parejas.');
+  const old = findActivityRow_(spreadsheet_().getSheetByName(TAB_ACTIVITIES), id);
+  const seen = {};
+  const pairs = body.pairs.map(function(pair, index) {
+    const pairId = String(pair.id || ('pareja-' + (index + 1))).slice(0, 100);
+    if (seen[pairId]) throw new Error('Cada pareja debe tener un identificador distinto.');
+    seen[pairId] = true;
+    function side_(value) {
+      value = value || {};
+      let imageUrl = String(value.imageUrl || '');
+      if (value.imageData) imageUrl = saveImage_(String(value.imageData), id + '-' + pairId);
+      const text = String(value.text || '').trim().slice(0, 160);
+      if (!text && !imageUrl) throw new Error('Cada lado necesita texto o una imagen.');
+      return { text: text, imageUrl: imageUrl || null };
+    }
+    return { id: pairId, left: side_(pair.left), right: side_(pair.right) };
+  });
+  const mode = ['none', 'up', 'down'].includes(body.timerMode) ? body.timerMode : 'none';
+  const activity = {
+    id: id, kind: 'pairs', title: title, instructions: 'Une cada elemento con su pareja.',
+    timerMode: mode, timeLimitSeconds: clamp_(body.timeLimitSeconds || 180, 15, 3600),
+    maxAttempts: body.maxAttempts === null ? null : clamp_(body.maxAttempts || 3, 1, 35),
+    imageUrl: '', labels: [], pairs: pairs
+  };
+  const sheet = spreadsheet_().getSheetByName(TAB_ACTIVITIES), now = new Date();
+  const row = [id, title, JSON.stringify(activity), '', now];
+  if (old) sheet.getRange(old.row, 1, 1, row.length).setValues([row]); else sheet.appendRow(row);
+  return activity;
+}
+
+function listPairActivities_() {
+  return listActivities_().filter(function(activity) { return activity.kind === 'pairs'; })
+    .map(function(activity) {
+      return { id: activity.id, kind: activity.kind, title: activity.title, timerMode: activity.timerMode,
+        timeLimitSeconds: activity.timeLimitSeconds, maxAttempts: activity.maxAttempts, pairs: activity.pairs };
+    });
+}
+
 function saveResult_(body) {
   const id = String(body.activityId || 'digestivo-inicial').slice(0, 100);
   const activity = getActivity_(id);
@@ -136,14 +177,21 @@ function saveResult_(body) {
   const names = account ? account.givenNames : clean_(body.givenNames, 100);
   if (!paternal || !maternal || !names) return { error: 'Inicia sesión con tu usuario y contraseña.' };
   const placements = body.placements && typeof body.placements === 'object' ? body.placements : {};
+  const matches = body.matches && typeof body.matches === 'object' ? body.matches : {};
   const safe = {};
   let correct = 0;
-  activity.labels.forEach(function(label) {
+  if (activity.kind === 'pairs') {
+    (activity.pairs || []).forEach(function(pair) {
+      const target = String(matches[pair.id] || '').slice(0, 100);
+      if ((activity.pairs || []).some(function(other) { return other.id === target; })) safe[pair.id] = target;
+      if (target === pair.id) correct++;
+    });
+  } else activity.labels.forEach(function(label) {
     const target = String(placements[label.id] || '').slice(0, 100);
     if (activity.labels.some(function(other) { return other.id === target; })) safe[label.id] = target;
     if (target === label.id) correct++;
   });
-  const total = activity.labels.length;
+  const total = activity.kind === 'pairs' ? (activity.pairs || []).length : activity.labels.length;
   const grade = Math.round((correct / Math.max(total, 1)) * 100) / 10;
   const elapsed = clamp_(body.elapsedSeconds || 0, 0, 86400);
   const remaining = body.remainingSeconds === null || body.remainingSeconds === undefined ? '' : clamp_(body.remainingSeconds, 0, 86400);
@@ -227,7 +275,7 @@ function getActivity_(id) {
   try {
     const activity = row.config;
     if (activity.maxAttempts === undefined) activity.maxAttempts = 3;
-    activity.instructions = 'Arrastra y suelta las chinchetas en su lugar correcto de la imagen.';
+    activity.instructions = activity.kind === 'pairs' ? 'Une cada elemento con su pareja.' : 'Arrastra y suelta las chinchetas en su lugar correcto de la imagen.';
     return activity;
   }
   catch (_) { return { error: 'La actividad guardada está dañada.' }; }
@@ -240,7 +288,7 @@ function listActivities_() {
     try {
       const activity = JSON.parse(row[2]);
       if (activity.maxAttempts === undefined) activity.maxAttempts = 3;
-      activity.instructions = 'Arrastra y suelta las chinchetas en su lugar correcto de la imagen.';
+      activity.instructions = activity.kind === 'pairs' ? 'Une cada elemento con su pareja.' : 'Arrastra y suelta las chinchetas en su lugar correcto de la imagen.';
       return activity;
     } catch (_) { return null; }
   }).filter(Boolean).reverse();
