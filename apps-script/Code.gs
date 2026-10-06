@@ -1,6 +1,7 @@
 const TAB_ACTIVITIES = 'Actividades';
 const TAB_RESULTS = 'Resultados';
 const TAB_STUDENTS = 'Alumnos';
+const TAB_DEADLINES = 'Fechas límite';
 const STUDENT_HEADERS = ['ID', 'Apellido paterno', 'Apellido materno', 'Nombre(s)', 'Usuario', 'Sal', 'Hash de contraseña', 'Activo', 'Creada', 'Versión de contraseña'];
 const RESULT_HEADERS = ['ID', 'Actividad ID', 'Apellido paterno', 'Apellido materno', 'Nombre(s)', 'Aciertos', 'Total', 'Calificación', 'Tiempo realizado (s)', 'Tiempo restante (s)', 'Tiempo agotado', 'Respuestas JSON', 'Fecha', 'Alumno ID'];
 
@@ -12,6 +13,7 @@ function setupMigration() {
   const activitySheet = getOrCreateSheet_(sheetFile, TAB_ACTIVITIES, ['ID', 'Título', 'Configuración JSON', 'Imagen URL', 'Actualizada']);
   getOrCreateSheet_(sheetFile, TAB_RESULTS, RESULT_HEADERS);
   getOrCreateSheet_(sheetFile, TAB_STUDENTS, STUDENT_HEADERS);
+  getOrCreateSheet_(sheetFile, TAB_DEADLINES, ['Actividad ID', 'Disponible hasta', 'Actualizada']);
   ensureTokenSecret_();
 
   let folderId = props.getProperty('DRIVE_FOLDER_ID');
@@ -60,6 +62,8 @@ function doPost(e) {
     else if (body.action === 'saveStudents') result = saveStudents_(body);
     else if (body.action === 'studentLogin') result = studentLogin_(body);
     else if (body.action === 'resetStudentPassword') result = resetStudentPassword_(body);
+    else if (body.action === 'setStudentActive') result = setStudentActive_(body);
+    else if (body.action === 'setActivityDeadline') result = setActivityDeadline_(body);
     else result = { error: 'Operación no reconocida.' };
     return output_(result, 'json');
   } catch (err) {
@@ -74,11 +78,13 @@ function routeGet_(p) {
   if (action === 'loginResult') return loginResult_(String(p.requestId || ''));
   if (action === 'attempts') return attemptInfo_(String(p.activityId || 'digestivo-inicial'), p.paternalSurname, p.maternalSurname, p.givenNames, p.studentToken);
   if (action === 'leaderboard') return leaderboard_(String(p.activityId || 'digestivo-inicial'));
+  if (action === 'studentPortal') return studentPortal_(String(p.studentToken || ''));
   if (action === 'capabilities') return { apiVersion: 4, kinds: ['diagram', 'pairs', 'quiz', 'quiz-show', 'true-false', 'group-sort', 'sequence', 'flashcards', 'memory', 'complete-sentence', 'complete-phrase', 'word-order', 'roulette', 'word-search'] };
   if (!authorized_(p.key)) return { error: 'Clave del maestro incorrecta.' };
   if (action === 'activities') return listActivities_();
   if (action === 'results') return listResults_();
   if (action === 'students') return listStudents_();
+  if (action === 'activityDeadline') return { availableUntil: getDeadlineMap_()[String(p.id || '')] || null };
   return { error: 'Operación no reconocida.' };
 }
 
@@ -294,6 +300,7 @@ function saveResult_(body) {
   const id = String(body.activityId || 'digestivo-inicial').slice(0, 100);
   const activity = getActivity_(id);
   if (activity.error) throw new Error('No se encontró la actividad.');
+  if (activity.availableUntil && new Date(activity.availableUntil).getTime() <= Date.now()) throw new Error('El plazo para esta actividad terminó.');
   const account = body.studentToken ? verifyStudentToken_(String(body.studentToken)) : null;
   if (body.studentToken && !account) throw new Error('Tu sesión venció. Vuelve a entrar con tu usuario y contraseña.');
   const paternal = account ? account.paternalSurname : clean_(body.paternalSurname, 70);
@@ -388,6 +395,7 @@ function attemptInfo_(activityId, paternalValue, maternalValue, namesValue, stud
   if (!paternal || !maternal || !names) return { error: 'Escribe los dos apellidos y tu nombre.' };
   const activity = getActivity_(activityId);
   if (activity.error) return { error: 'No se encontró la actividad.' };
+  if (activity.availableUntil && new Date(activity.availableUntil).getTime() <= Date.now()) return { error: 'El plazo para esta actividad terminó.' };
   const sheet = spreadsheet_().getSheetByName(TAB_RESULTS);
   let used = 0;
   if (sheet.getLastRow() > 1) {
@@ -404,18 +412,67 @@ function attemptInfo_(activityId, paternalValue, maternalValue, namesValue, stud
 function leaderboard_(activityId) {
   const activity = getActivity_(activityId);
   if (activity.error) return { error: 'No se encontró la actividad.' };
-  const best = {};
+  const best = {}, counts = {};
   listResults_().filter(function(row) { return row.activity_id === activityId; }).forEach(function(row) {
     const key = row.student_id || [normalizeStudent_(row.paternal_surname), normalizeStudent_(row.maternal_surname), normalizeStudent_(row.given_names)].join('|');
+    counts[key] = (counts[key] || 0) + 1;
     const previous = best[key];
-    if (!previous || Number(row.correct) > Number(previous.correct) || (Number(row.correct) === Number(previous.correct) && Number(row.elapsed_seconds) < Number(previous.elapsed_seconds))) best[key] = row;
+    if (!previous || Number(row.grade) > Number(previous.grade) || (Number(row.grade) === Number(previous.grade) && Number(row.correct) > Number(previous.correct)) || (Number(row.grade) === Number(previous.grade) && Number(row.correct) === Number(previous.correct) && Number(row.elapsed_seconds) < Number(previous.elapsed_seconds))) best[key] = row;
   });
-  return Object.keys(best).map(function(key) { return best[key]; })
-    .sort(function(a, b) { return Number(b.correct) - Number(a.correct) || Number(a.elapsed_seconds) - Number(b.elapsed_seconds) || String(a.paternal_surname).localeCompare(String(b.paternal_surname), 'es-MX'); })
+  return Object.keys(best).map(function(key) { return { row: best[key], attempts: counts[key] }; })
+    .sort(function(a, b) { return Number(b.row.grade) - Number(a.row.grade) || Number(b.row.correct) - Number(a.row.correct) || Number(a.row.elapsed_seconds) - Number(b.row.elapsed_seconds) || String(a.row.paternal_surname).localeCompare(String(b.row.paternal_surname), 'es-MX'); })
     .slice(0, 35)
-    .map(function(row, index) {
-      return { rank: index + 1, name: String(row.given_names).trim().split(/\s+/)[0], paternalSurname: row.paternal_surname, correct: Number(row.correct), total: Number(row.total), grade: Number(row.grade), elapsedSeconds: Number(row.elapsed_seconds) };
+    .map(function(item, index) {
+      const row = item.row;
+      return { rank: index + 1, name: String(row.given_names).trim().split(/\s+/)[0], paternalSurname: row.paternal_surname, grade: Number(row.grade), attempts: Number(item.attempts) };
     });
+}
+
+function studentPortal_(token) {
+  const account = verifyStudentToken_(token);
+  if (!account || !account.active) return { error: 'La sesión del alumno venció. Inicia sesión de nuevo.' };
+  const attempts = listResults_().filter(function(row) { return row.student_id === account.id; });
+  const deadlineMap = getDeadlineMap_();
+  const activities = listActivities_().map(function(activity) {
+    const dueAt = deadlineMap[activity.id] || '';
+    const rows = attempts.filter(function(row) { return row.activity_id === activity.id; });
+    const best = rows.reduce(function(current, row) {
+      if (!current || Number(row.grade) > Number(current.grade) || (Number(row.grade) === Number(current.grade) && Number(row.correct) > Number(current.correct))) return row;
+      return current;
+    }, null);
+    const expired = Boolean(dueAt && new Date(dueAt).getTime() <= Date.now());
+    return { id: activity.id, title: activity.title, kind: activity.kind || 'diagram', dueAt: dueAt || null,
+      expired: expired, attempts: rows.length, bestGrade: best ? Number(best.grade) : null, completed: rows.length > 0 };
+  });
+  const grades = activities.filter(function(item) { return item.bestGrade !== null; }).map(function(item) { return Number(item.bestGrade); });
+  const average = grades.length ? Math.round(grades.reduce(function(sum, grade) { return sum + grade; }, 0) / grades.length * 10) / 10 : null;
+  return { student: { id: account.id, name: account.givenNames, givenNames: account.givenNames, paternalSurname: account.paternalSurname, maternalSurname: account.maternalSurname, username: account.username }, activities: activities, average: average, completedCount: grades.length };
+}
+
+function getDeadlineMap_() {
+  const sheet = spreadsheet_().getSheetByName(TAB_DEADLINES), map = {};
+  if (!sheet || sheet.getLastRow() < 2) return map;
+  sheet.getRange(2, 1, sheet.getLastRow() - 1, 2).getValues().forEach(function(row) { if (row[0] && row[1]) map[String(row[0])] = new Date(row[1]).toISOString(); });
+  return map;
+}
+
+function setActivityDeadline_(body) {
+  if (!authorized_(body.key)) throw new Error('Clave del maestro incorrecta.');
+  const id = String(body.id || '').slice(0, 100);
+  if (!findActivityRow_(spreadsheet_().getSheetByName(TAB_ACTIVITIES), id)) throw new Error('No se encontró la actividad.');
+  const raw = String(body.availableUntil || '').trim(), sheet = spreadsheet_().getSheetByName(TAB_DEADLINES);
+  const rows = sheet.getLastRow() < 2 ? [] : sheet.getRange(2, 1, sheet.getLastRow() - 1, 3).getValues();
+  const index = rows.findIndex(function(row) { return String(row[0]) === id; });
+  if (!raw) {
+    if (index >= 0) sheet.deleteRow(index + 2);
+    return { ok: true, availableUntil: null };
+  }
+  const date = new Date(raw);
+  if (!isFinite(date.getTime())) throw new Error('La fecha y hora de cierre no son válidas.');
+  const value = date.toISOString();
+  if (index >= 0) sheet.getRange(index + 2, 1, 1, 3).setValues([[id, value, new Date()]]);
+  else sheet.appendRow([id, value, new Date()]);
+  return { ok: true, availableUntil: value };
 }
 
 function normalizeWord_(value) { return String(value || '').toLocaleUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-ZÑ]/g, ''); }
@@ -456,6 +513,7 @@ function getActivity_(id) {
   try {
     const activity = row.config;
     if (activity.archivedAt) return { error: 'La actividad fue archivada.' };
+    activity.availableUntil = getDeadlineMap_()[id] || null;
     if (activity.maxAttempts === undefined) activity.maxAttempts = 3;
     if (activity.kind === 'pairs') activity.instructions = activity.instructions || 'Arrastra cada elemento junto a su pareja. En celular, toca un elemento y después su pareja.';
     else if (activity.kind === 'diagram' || !activity.kind) activity.instructions = 'Arrastra y suelta las chinchetas en su lugar correcto de la imagen.';
@@ -468,10 +526,12 @@ function getActivity_(id) {
 function listActivities_() {
   const sheet = spreadsheet_().getSheetByName(TAB_ACTIVITIES);
   if (sheet.getLastRow() < 2) return [];
+  const deadlineMap = getDeadlineMap_();
   return sheet.getRange(2, 1, sheet.getLastRow() - 1, 3).getValues().map(function(row) {
     try {
       const activity = JSON.parse(row[2]);
       if (activity.archivedAt) return null;
+      activity.availableUntil = deadlineMap[String(row[0])] || null;
       if (activity.maxAttempts === undefined) activity.maxAttempts = 3;
       if (activity.kind === 'pairs') activity.instructions = activity.instructions || 'Une cada elemento con su pareja.';
       else if (activity.kind === 'diagram' || !activity.kind) activity.instructions = 'Arrastra y suelta las chinchetas en su lugar correcto de la imagen.';
@@ -658,6 +718,20 @@ function resetStudentPassword_(body) {
   sheet.getRange(row, 10).setValue(Utilities.getUuid());
   SpreadsheetApp.flush();
   return { reset: true };
+}
+
+function setStudentActive_(body) {
+  if (!authorized_(body.key)) throw new Error('Clave del maestro incorrecta.');
+  const id = String(body.studentId || '');
+  const rows = getStudentRows_();
+  const index = rows.findIndex(function(s) { return s.id === id; });
+  if (index < 0) throw new Error('No se encontró la cuenta del alumno.');
+  const sheet = spreadsheet_().getSheetByName(TAB_STUDENTS), row = index + 2;
+  const active = body.active === true;
+  sheet.getRange(row, 8).setValue(active);
+  sheet.getRange(row, 10).setValue(Utilities.getUuid());
+  SpreadsheetApp.flush();
+  return { ok: true, active: active };
 }
 
 function passwordHash_(salt, password) {
