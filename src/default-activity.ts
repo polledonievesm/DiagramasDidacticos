@@ -6,7 +6,7 @@ export type QuizQuestion = { id: string; prompt: string; imageUrl?: string | nul
 export type SortGroup = { id: string; title: string; color: string };
 export type SortItem = { id: string; text: string; imageUrl?: string | null; imageData?: string | null; groupId: string };
 export type SequenceStep = { id: string; text: string; imageUrl?: string | null; imageData?: string | null; order: number };
-export type ActivityKind = "diagram" | "pairs" | "quiz" | "group-sort" | "sequence";
+export type ActivityKind = "diagram" | "pairs" | "quiz" | "group-sort" | "sequence" | "flashcards" | "memory";
 export type Activity = {
   kind?: ActivityKind;
   pairs?: MatchingPair[];
