@@ -11,7 +11,7 @@ function editorUrl(activity?: Activity, templateId = "diagram-labels", duplicate
   url.searchParams.set("modo", "maestro");
   if (activity && !duplicate) url.searchParams.set("actividad", activity.id);
   if (duplicate) url.searchParams.set("duplicar", "1");
-  if (!activity) url.searchParams.set("plantilla", templateId);
+  if (!activity) { url.searchParams.set("plantilla", templateId); url.searchParams.set("nueva", "1"); }
   return url.toString();
 }
 
