@@ -147,7 +147,7 @@ function savePairActivity_(body, id, title) {
   });
   const mode = ['none', 'up', 'down'].includes(body.timerMode) ? body.timerMode : 'none';
   const activity = {
-    id: id, kind: 'pairs', title: title, instructions: 'Une cada elemento con su pareja.',
+    id: id, kind: 'pairs', title: title, instructions: String(body.instructions || 'Arrastra cada elemento junto a su pareja. En celular, toca un elemento y después su pareja.').trim().slice(0, 240),
     timerMode: mode, timeLimitSeconds: clamp_(body.timeLimitSeconds || 180, 15, 3600),
     maxAttempts: body.maxAttempts === null ? null : clamp_(body.maxAttempts || 3, 1, 35),
     imageUrl: '', labels: [], pairs: pairs
@@ -275,7 +275,7 @@ function getActivity_(id) {
   try {
     const activity = row.config;
     if (activity.maxAttempts === undefined) activity.maxAttempts = 3;
-    activity.instructions = activity.kind === 'pairs' ? 'Une cada elemento con su pareja.' : 'Arrastra y suelta las chinchetas en su lugar correcto de la imagen.';
+    activity.instructions = activity.kind === 'pairs' ? (activity.instructions || 'Arrastra cada elemento junto a su pareja. En celular, toca un elemento y después su pareja.') : 'Arrastra y suelta las chinchetas en su lugar correcto de la imagen.';
     return activity;
   }
   catch (_) { return { error: 'La actividad guardada está dañada.' }; }
