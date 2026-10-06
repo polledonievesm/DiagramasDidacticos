@@ -74,7 +74,7 @@ function routeGet_(p) {
   if (action === 'loginResult') return loginResult_(String(p.requestId || ''));
   if (action === 'attempts') return attemptInfo_(String(p.activityId || 'digestivo-inicial'), p.paternalSurname, p.maternalSurname, p.givenNames, p.studentToken);
   if (action === 'leaderboard') return leaderboard_(String(p.activityId || 'digestivo-inicial'));
-  if (action === 'capabilities') return { apiVersion: 3, kinds: ['diagram', 'pairs', 'quiz', 'group-sort', 'sequence', 'flashcards', 'memory', 'complete-sentence', 'word-order', 'roulette', 'word-search'] };
+  if (action === 'capabilities') return { apiVersion: 4, kinds: ['diagram', 'pairs', 'quiz', 'quiz-show', 'true-false', 'group-sort', 'sequence', 'flashcards', 'memory', 'complete-sentence', 'complete-phrase', 'word-order', 'roulette', 'word-search'] };
   if (!authorized_(p.key)) return { error: 'Clave del maestro incorrecta.' };
   if (action === 'activities') return listActivities_();
   if (action === 'results') return listResults_();
@@ -88,7 +88,7 @@ function saveActivity_(body) {
   const title = String(body.title || '').trim().slice(0, 120);
   if (!title) throw new Error('Escribe el título de la actividad.');
   if (body.kind === 'pairs') return savePairActivity_(body, id, title);
-  if (['quiz', 'group-sort', 'sequence', 'complete-sentence', 'word-order', 'roulette', 'word-search'].includes(body.kind)) return saveTemplateActivity_(body, id, title);
+  if (['quiz', 'quiz-show', 'true-false', 'group-sort', 'sequence', 'complete-sentence', 'complete-phrase', 'word-order', 'roulette', 'word-search'].includes(body.kind)) return saveTemplateActivity_(body, id, title);
   if (!Array.isArray(body.labels) || body.labels.length < 1 || body.labels.length > 10) throw new Error('La actividad requiere de 1 a 10 etiquetas.');
 
   const sheet = spreadsheet_().getSheetByName(TAB_ACTIVITIES);
@@ -152,16 +152,16 @@ function saveTemplateActivity_(body, id, title) {
     content.wheelEntries = body.wheelEntries.map(function(entry, i) { const entryId = unique_(entry.id, 'opcion-' + (i + 1)); const text = String(entry.text || '').trim().slice(0, 180); const imageUrl = image_(entry, entryId); if (!text && !imageUrl) throw new Error('Cada opción necesita texto o imagen.'); return { id: entryId, text: text, imageUrl: imageUrl }; });
   } else if (kind === 'word-search') {
     if (!Array.isArray(body.wordSearchWords) || body.wordSearchWords.length < 3 || body.wordSearchWords.length > 20) throw new Error('Agrega entre 3 y 20 palabras.');
-    const size = clamp_(body.wordSearchGridSize || 10, 8, 15), seenWords = {};
+    const size = clamp_(body.wordSearchGridSize || 10, 10, 15), seenWords = {};
     content.wordSearchWords = body.wordSearchWords.map(function(word) { const text = String(word || '').trim().slice(0, 30), normalized = normalizeWord_(text); if (!normalized || normalized.length > size) throw new Error('Cada palabra debe caber en la cuadrícula de ' + size + ' letras.'); if (seenWords[normalized]) throw new Error('No repitas palabras en la sopa de letras.'); seenWords[normalized] = true; return text; });
     content.wordSearchGridSize = size; content.wordSearchDirections = ['horizontal', 'vertical', 'diagonal'];
-  } else if (kind === 'quiz') {
+  } else if (kind === 'quiz' || kind === 'quiz-show' || kind === 'true-false') {
     if (!Array.isArray(body.questions) || body.questions.length < 1 || body.questions.length > 50) throw new Error('Agrega entre 1 y 50 preguntas.');
     content.questions = body.questions.map(function(question, qi) {
       const questionId = unique_(question.id, 'pregunta-' + (qi + 1));
       const prompt = String(question.prompt || '').trim().slice(0, 500);
       if (!prompt) throw new Error('Escribe el texto de cada pregunta.');
-      if (!Array.isArray(question.options) || question.options.length < 2 || question.options.length > 5) throw new Error('Cada pregunta requiere entre 2 y 5 opciones.');
+      if (!Array.isArray(question.options) || question.options.length < 2 || question.options.length > (kind === 'true-false' ? 2 : 5) || (kind === 'true-false' && question.options.length !== 2)) throw new Error('Cada pregunta requiere opciones válidas.');
       const optionIds = {};
       const options = question.options.map(function(option, oi) {
         const optionId = String(option.id || ('opcion-' + (oi + 1))).slice(0, 100);
@@ -192,7 +192,7 @@ function saveTemplateActivity_(body, id, title) {
       if (!text || !groupIds[groupId]) throw new Error('Cada elemento necesita texto y un grupo correcto.');
       return { id: itemId, text: text, imageUrl: image_(item, itemId), groupId: groupId };
     });
-  } else if (kind === 'complete-sentence') {
+  } else if (kind === 'complete-sentence' || kind === 'complete-phrase') {
     if (!Array.isArray(body.sentences) || body.sentences.length < 1 || body.sentences.length > 50) throw new Error('Agrega entre 1 y 50 oraciones.');
     content.sentences = body.sentences.map(function(sentence, i) {
       const sentenceId = unique_(sentence.id, 'oracion-' + (i + 1));
@@ -200,8 +200,10 @@ function saveTemplateActivity_(body, id, title) {
       const answer = String(sentence.answer || '').trim().slice(0, 120);
       const after = String(sentence.after || '').trim().slice(0, 500);
       if (!before || !answer) throw new Error('Cada oración requiere texto y una respuesta correcta.');
+      if (kind === 'complete-phrase' && normalizeWord_(answer).length > clamp_(body.phraseGridSize || 10, 10, 15)) throw new Error('Una respuesta no cabe en la cuadrícula elegida.');
       return { id: sentenceId, before: before, answer: answer, after: after, imageUrl: image_(sentence, sentenceId) };
     });
+    if (kind === 'complete-phrase') content.phraseGridSize = clamp_(body.phraseGridSize || 10, 10, 15);
   } else if (kind === 'word-order') {
     if (!Array.isArray(body.wordSentences) || body.wordSentences.length < 1 || body.wordSentences.length > 30) throw new Error('Agrega entre 1 y 30 oraciones.');
     content.wordSentences = body.wordSentences.map(function(sentence, i) {
@@ -308,7 +310,7 @@ function saveResult_(body) {
   } else if (activity.kind === 'word-search') {
     const allowed = {}; (activity.wordSearchWords || []).forEach(function(word) { allowed[normalizeWord_(word)] = word; });
     (Array.isArray(answers.foundWords) ? answers.foundWords : []).forEach(function(word) { const normalized = normalizeWord_(word); if (allowed[normalized] && !safe[allowed[normalized]]) { safe[allowed[normalized]] = allowed[normalized]; correct++; } });
-  } else if (activity.kind === 'quiz') {
+  } else if (activity.kind === 'quiz' || activity.kind === 'quiz-show' || activity.kind === 'true-false') {
     (activity.questions || []).forEach(function(question) {
       const selected = String(answers[question.id] || '');
       if ((question.options || []).some(function(option) { return option.id === selected; })) safe[question.id] = selected;
@@ -325,7 +327,7 @@ function saveResult_(body) {
     const correctSteps = (activity.steps || []).slice().sort(function(a, b) { return Number(a.order) - Number(b.order); });
     correctSteps.forEach(function(step, index) { if (submittedOrder[index] === step.id) correct++; });
     safe.order = submittedOrder.filter(function(stepId) { return correctSteps.some(function(step) { return step.id === stepId; }); });
-  } else if (activity.kind === 'complete-sentence') {
+  } else if (activity.kind === 'complete-sentence' || activity.kind === 'complete-phrase') {
     (activity.sentences || []).forEach(function(sentence) {
       const submitted = String(answers[sentence.id] || '').slice(0, 120);
       safe[sentence.id] = submitted;
@@ -354,7 +356,7 @@ function saveResult_(body) {
     if (activity.labels.some(function(other) { return other.id === target; })) safe[label.id] = target;
     if (target === label.id) correct++;
   });
-  const total = activity.kind === 'pairs' || activity.kind === 'flashcards' || activity.kind === 'memory' ? (activity.pairs || []).length : activity.kind === 'quiz' ? (activity.questions || []).length : activity.kind === 'group-sort' ? (activity.items || []).length : activity.kind === 'sequence' ? (activity.steps || []).length : activity.kind === 'complete-sentence' ? (activity.sentences || []).length : activity.kind === 'word-order' ? (activity.wordSentences || []).reduce(function(sum, sentence) { return sum + (sentence.words || []).length; }, 0) : activity.kind === 'roulette' ? (activity.wheelEntries || []).length : activity.kind === 'word-search' ? (activity.wordSearchWords || []).length : activity.labels.length;
+  const total = activity.kind === 'pairs' || activity.kind === 'flashcards' || activity.kind === 'memory' ? (activity.pairs || []).length : activity.kind === 'quiz' || activity.kind === 'quiz-show' || activity.kind === 'true-false' ? (activity.questions || []).length : activity.kind === 'group-sort' ? (activity.items || []).length : activity.kind === 'sequence' ? (activity.steps || []).length : activity.kind === 'complete-sentence' || activity.kind === 'complete-phrase' ? (activity.sentences || []).length : activity.kind === 'word-order' ? (activity.wordSentences || []).reduce(function(sum, sentence) { return sum + (sentence.words || []).length; }, 0) : activity.kind === 'roulette' ? (activity.wheelEntries || []).length : activity.kind === 'word-search' ? (activity.wordSearchWords || []).length : activity.labels.length;
   const grade = Math.round((correct / Math.max(total, 1)) * 100) / 10;
   const elapsed = clamp_(body.elapsedSeconds || 0, 0, 86400);
   const remaining = body.remainingSeconds === null || body.remainingSeconds === undefined ? '' : clamp_(body.remainingSeconds, 0, 86400);
@@ -415,7 +417,7 @@ function leaderboard_(activityId) {
     });
 }
 
-function normalizeWord_(value) { return String(value || '').toLocaleUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-Z]/g, ''); }
+function normalizeWord_(value) { return String(value || '').toLocaleUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-ZÑ]/g, ''); }
 
 function normalizeStudent_(value) {
   return String(value || '').trim().toLocaleLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ');

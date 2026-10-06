@@ -11,13 +11,13 @@ import "./globals.css";
 
 const query=new URLSearchParams(window.location.search);
 const game=query.get("juego")||"";
-const generic=["quiz","group-sort","sequence"].includes(game);
+const generic=["quiz","quiz-show","true-false","group-sort","sequence"].includes(game);
 const cards=["flashcards","memory"].includes(game);
 const textGames=["complete-sentence","word-order"].includes(game);
-const extraGames=["roulette","word-search"].includes(game);
+const extraGames=["roulette","word-search","complete-phrase"].includes(game);
 
 createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    {query.get("panel")==="actividades" ? <ActivityManager /> : game==="parejas" ? <PairGame /> : generic ? <TemplateGame kind={game as "quiz"|"group-sort"|"sequence"} /> : cards ? <CardGame kind={game as "flashcards"|"memory"} /> : textGames ? <TextGame kind={game as "complete-sentence"|"word-order"} /> : extraGames ? <ExtraGame kind={game as "roulette"|"word-search"} /> : <App />}
+    {["actividades","resultados"].includes(query.get("panel")||"") ? <ActivityManager /> : game==="parejas" ? <PairGame /> : generic ? <TemplateGame kind={game as "quiz"|"quiz-show"|"true-false"|"group-sort"|"sequence"} /> : cards ? <CardGame kind={game as "flashcards"|"memory"} /> : textGames ? <TextGame kind={game as "complete-sentence"|"word-order"} /> : extraGames ? <ExtraGame kind={game as "roulette"|"word-search"|"complete-phrase"} /> : <App />}
   </React.StrictMode>,
 );
