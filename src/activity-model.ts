@@ -1,8 +1,8 @@
 import type { Activity as LegacyActivity, MatchingPair } from "./default-activity";
 
 export type TemplateId =
-  | "diagram-labels" | "pairs" | "quiz" | "group-sort" | "sequence"
-  | "complete-sentence" | "word-order" | "flashcards" | "roulette" | "memory" | "word-search";
+  | "diagram-labels" | "pairs" | "quiz" | "quiz-show" | "true-false" | "group-sort" | "sequence"
+  | "complete-sentence" | "complete-phrase" | "word-order" | "flashcards" | "roulette" | "memory" | "word-search";
 
 export type TimerMode = "none" | "up" | "down";
 export type SharedSettings = {
@@ -35,7 +35,7 @@ export type GroupContent = {
   items: Array<{ id: string; text: string; imageUrl?: string | null; groupId: string }>;
 };
 export type SequenceContent = { type: "sequence"; steps: Array<{ id: string; text: string; imageUrl?: string | null; order: number }> };
-export type SentenceContent = { type: "sentences"; sentences: Array<{ id: string; before: string; answer: string; after: string; alternatives?: string[]; imageUrl?: string | null }> };
+export type SentenceContent = { type: "sentences"; sentences: Array<{ id: string; before: string; answer: string; after: string; alternatives?: string[]; imageUrl?: string | null }>; gridSize?: number };
 export type WordOrderContent = { type: "word-order"; sentences: Array<{ id: string; words: string[] }> };
 export type CardsContent = { type: "cards"; cards: Array<{ id: string; front: { text: string; imageUrl?: string | null }; back: { text: string; imageUrl?: string | null } }> };
 export type WheelContent = { type: "wheel"; entries: Array<{ id: string; text: string; imageUrl?: string | null }> };
@@ -93,5 +93,5 @@ export function convertRelationTemplate(activity: CommonActivity, target: Templa
 }
 
 export function isTemplateImplemented(id: TemplateId): boolean {
-  return ["diagram-labels", "pairs", "quiz", "group-sort", "sequence", "complete-sentence", "word-order", "flashcards", "memory", "roulette", "word-search"].includes(id);
+  return ["diagram-labels", "pairs", "quiz", "quiz-show", "true-false", "group-sort", "sequence", "complete-sentence", "complete-phrase", "word-order", "flashcards", "memory", "roulette", "word-search"].includes(id);
 }
