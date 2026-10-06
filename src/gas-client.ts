@@ -4,6 +4,18 @@ type ApiResult = Record<string, unknown>;
 let cachedActivities = new Map<string, Activity>();
 let cachedActivity: Activity | null = null;
 const teacherKeyNames = ["platformTeacherKey", "pairTeacherKey", "diagramTeacherKey"] as const;
+const STUDENT_SESSION_KEY = "aulaStudentSessionV1";
+export type StudentSessionProfile = { id:string; name?:string; givenNames:string; paternalSurname:string; maternalSurname:string; username:string };
+
+export function getStudentSession() {
+  try { return JSON.parse(sessionStorage.getItem(STUDENT_SESSION_KEY) || "null") as { token: string; student: StudentSessionProfile } | null; }
+  catch { return null; }
+}
+export function saveStudentSession(token: string, student: StudentSessionProfile) {
+  const normalized = { ...student, givenNames: student.givenNames || student.name || "" };
+  sessionStorage.setItem(STUDENT_SESSION_KEY, JSON.stringify({ token, student: normalized }));
+}
+export function clearStudentSession() { sessionStorage.removeItem(STUDENT_SESSION_KEY); }
 
 export function getTeacherKey() {
   for (const name of teacherKeyNames) {
@@ -80,6 +92,11 @@ export async function apiRequest(path: string, init: RequestInit = {}) {
   if (method === "GET" && url.pathname.endsWith("/api/capabilities")) {
     const data = await jsonp<ApiResult>({ action: "capabilities" });
     return response(data, typeof data.apiVersion === "number" ? 200 : 404);
+  }
+  if (method === "GET" && url.pathname.endsWith("/api/student/portal")) {
+    const token = url.searchParams.get("studentToken") || "";
+    const data = await jsonp<ApiResult>({ action: "studentPortal", studentToken: token });
+    return response(data, "error" in data ? 401 : 200);
   }
   if (method === "GET" && url.pathname.endsWith("/api/activity")) {
     const data = await jsonp<Activity>({ action: "activity", id: url.searchParams.get("id") || "" });
@@ -161,6 +178,25 @@ export async function apiRequest(path: string, init: RequestInit = {}) {
     const updated = data.find((s) => String(s.id) === studentId);
     if (!updated || updated.password_version === previous.password_version) return response({ error: "No se pudo verificar el cambio de contraseña. Comprueba la clave del maestro e inténtalo otra vez." }, 503);
     return response({ students: data });
+  }
+  if (method === "POST" && url.pathname.endsWith("/api/teacher/student-active")) {
+    const key = new Headers(init.headers).get("x-teacher-key") || "";
+    await send({ ...body, action: "setStudentActive", key });
+    const data = await jsonp<ApiResult[]>({ action: "students", key });
+    if (!Array.isArray(data)) return response(data as ApiResult, 401);
+    const updated = data.find(student => String(student.id) === String(body.studentId || ""));
+    if (!updated || Boolean(updated.active) !== (body.active === true)) return response({ error: "No se pudo verificar el cambio de estado de la cuenta." }, 503);
+    return response({ students: data });
+  }
+  if (method === "POST" && url.pathname.endsWith("/api/teacher/activity-deadline")) {
+    const key = new Headers(init.headers).get("x-teacher-key") || "";
+    await send({ ...body, action: "setActivityDeadline", key });
+    const data = await jsonp<ApiResult>({ action: "activityDeadline", id: String(body.id || ""), key });
+    if ("error" in data) return response(data, 401);
+    const wanted = body.availableUntil ? new Date(String(body.availableUntil)).getTime() : null;
+    const saved = data.availableUntil ? new Date(String(data.availableUntil)).getTime() : null;
+    if (wanted !== saved) return response({ error: "No se pudo verificar la fecha de cierre guardada." }, 503);
+    return response(data);
   }
   if (method === "POST" && url.pathname.endsWith("/api/submit")) {
     const id = String(body.activityId || "digestivo-inicial");
