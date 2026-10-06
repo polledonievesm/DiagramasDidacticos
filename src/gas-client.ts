@@ -150,7 +150,7 @@ export async function apiRequest(path: string, init: RequestInit = {}) {
       const submitted = Array.isArray(answers.order) ? answers.order.map(String) : [];
       correct = [...(activity.steps || [])].sort((a, b) => a.order - b.order).filter((step, index) => submitted[index] === step.id).length;
     } else if (activity.kind === "complete-sentence") {
-      const normalizeAnswer = (value: unknown) => String(value || "").trim().toLocaleLowerCase("es-MX").normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").replace(/\\s+/g, " ");
+      const normalizeAnswer = (value: unknown) => String(value || "").trim().toLocaleLowerCase("es-MX").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\\s+/g, " ");
       correct = (activity.sentences || []).filter((sentence) => normalizeAnswer(answers[sentence.id]) === normalizeAnswer(sentence.answer)).length;
     } else if (activity.kind === "word-order") {
       (activity.wordSentences || []).forEach((sentence) => {
@@ -161,7 +161,7 @@ export async function apiRequest(path: string, init: RequestInit = {}) {
     } else if (activity.kind === "flashcards" || activity.kind === "memory") correct = (activity.pairs || []).filter((pair) => answers[pair.id] === pair.id).length;
     else if (activity.kind === "pairs") correct = (activity.pairs || []).filter((pair) => matches[pair.id] === pair.id).length;
     else if (activity.kind === "roulette") { const ids = new Set(Array.isArray(answers.completedIds) ? (answers.completedIds as unknown[]).map(String) : []); correct = (activity.wheelEntries || []).filter((entry) => ids.has(entry.id)).length; }
-    else if (activity.kind === "word-search") { const normalizeWord = (word: string) => word.toLocaleUpperCase("es-MX").normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").replace(/[^A-Z]/g, ""); const found = new Set(Array.isArray(answers.foundWords) ? (answers.foundWords as unknown[]).map((word) => normalizeWord(String(word))) : []); correct = (activity.wordSearchWords || []).filter((word) => found.has(normalizeWord(word))).length; }
+    else if (activity.kind === "word-search") { const normalizeWord = (word: string) => word.toLocaleUpperCase("es-MX").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Z]/g, ""); const found = new Set(Array.isArray(answers.foundWords) ? (answers.foundWords as unknown[]).map((word) => normalizeWord(String(word))) : []); correct = (activity.wordSearchWords || []).filter((word) => found.has(normalizeWord(word))).length; }
     else correct = activity.labels.filter((label) => placements[label.id] === label.id).length;
     const total = activity.kind === "pairs" || activity.kind === "flashcards" || activity.kind === "memory" ? (activity.pairs || []).length : activity.kind === "quiz" ? (activity.questions || []).length : activity.kind === "group-sort" ? (activity.items || []).length : activity.kind === "sequence" ? (activity.steps || []).length : activity.kind === "complete-sentence" ? (activity.sentences || []).length : activity.kind === "word-order" ? (activity.wordSentences || []).reduce((sum, sentence) => sum + (sentence.words || []).length, 0) : activity.kind === "roulette" ? (activity.wheelEntries || []).length : activity.kind === "word-search" ? (activity.wordSearchWords || []).length : activity.labels.length;
     const elapsedSeconds = Number(body.elapsedSeconds) || 0;
