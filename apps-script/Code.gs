@@ -57,6 +57,7 @@ function doPost(e) {
     if (body.action === 'submit') result = saveResult_(body);
     else if (body.action === 'saveActivity') result = saveActivity_(body);
     else if (body.action === 'archiveActivity') result = archiveActivity_(body);
+    else if (body.action === 'archiveActivity') result = archiveActivity_(body);
     else if (body.action === 'saveStudents') result = saveStudents_(body);
     else if (body.action === 'studentLogin') result = studentLogin_(body);
     else if (body.action === 'resetStudentPassword') result = resetStudentPassword_(body);
@@ -87,6 +88,7 @@ function saveActivity_(body) {
   const title = String(body.title || '').trim().slice(0, 120);
   if (!title) throw new Error('Escribe el título de la actividad.');
   if (body.kind === 'pairs') return savePairActivity_(body, id, title);
+  if (['quiz', 'group-sort', 'sequence'].includes(body.kind)) return saveTemplateActivity_(body, id, title);
   if (!Array.isArray(body.labels) || body.labels.length < 1 || body.labels.length > 10) throw new Error('La actividad requiere de 1 a 10 etiquetas.');
 
   const sheet = spreadsheet_().getSheetByName(TAB_ACTIVITIES);
@@ -125,6 +127,84 @@ function saveActivity_(body) {
   const row = [id, title, JSON.stringify(activity), imageUrl, now];
   if (old) sheet.getRange(old.row, 1, 1, row.length).setValues([row]);
   else sheet.appendRow(row);
+  return activity;
+}
+
+function saveTemplateActivity_(body, id, title) {
+  const sheet = spreadsheet_().getSheetByName(TAB_ACTIVITIES);
+  const old = findActivityRow_(sheet, id);
+  const kind = String(body.kind || '');
+  const seen = {};
+  function unique_(value, fallback) {
+    const itemId = String(value || fallback).slice(0, 100);
+    if (!itemId || seen[itemId]) throw new Error('Cada elemento debe tener un identificador distinto.');
+    seen[itemId] = true;
+    return itemId;
+  }
+  function image_(item, suffix) {
+    let imageUrl = String(item.imageUrl || '');
+    if (item.imageData) imageUrl = saveImage_(String(item.imageData), id + '-' + suffix);
+    return imageUrl || null;
+  }
+  const content = {};
+  if (kind === 'quiz') {
+    if (!Array.isArray(body.questions) || body.questions.length < 1 || body.questions.length > 50) throw new Error('Agrega entre 1 y 50 preguntas.');
+    content.questions = body.questions.map(function(question, qi) {
+      const questionId = unique_(question.id, 'pregunta-' + (qi + 1));
+      const prompt = String(question.prompt || '').trim().slice(0, 500);
+      if (!prompt) throw new Error('Escribe el texto de cada pregunta.');
+      if (!Array.isArray(question.options) || question.options.length < 2 || question.options.length > 5) throw new Error('Cada pregunta requiere entre 2 y 5 opciones.');
+      const optionIds = {};
+      const options = question.options.map(function(option, oi) {
+        const optionId = String(option.id || ('opcion-' + (oi + 1))).slice(0, 100);
+        if (optionIds[optionId]) throw new Error('Las opciones de cada pregunta deben tener identificadores distintos.');
+        optionIds[optionId] = true;
+        const text = String(option.text || '').trim().slice(0, 240);
+        if (!text) throw new Error('Completa todas las opciones.');
+        return { id: optionId, text: text };
+      });
+      const correctOptionId = String(question.correctOptionId || '');
+      if (!optionIds[correctOptionId]) throw new Error('Marca una respuesta correcta para cada pregunta.');
+      return { id: questionId, prompt: prompt, imageUrl: image_(question, questionId), options: options, correctOptionId: correctOptionId };
+    });
+  } else if (kind === 'group-sort') {
+    if (!Array.isArray(body.groups) || body.groups.length < 2 || body.groups.length > 8) throw new Error('Agrega entre 2 y 8 grupos.');
+    const groupIds = {};
+    content.groups = body.groups.map(function(group, i) {
+      const groupId = unique_(group.id, 'grupo-' + (i + 1));
+      groupIds[groupId] = true;
+      return { id: groupId, title: String(group.title || '').trim().slice(0, 80), color: /^#[0-9a-fA-F]{6}$/.test(group.color) ? group.color : '#43866e' };
+    });
+    if (content.groups.some(function(group) { return !group.title; })) throw new Error('Escribe el nombre de cada grupo.');
+    if (!Array.isArray(body.items) || body.items.length < 2 || body.items.length > 50) throw new Error('Agrega entre 2 y 50 elementos.');
+    content.items = body.items.map(function(item, i) {
+      const itemId = unique_(item.id, 'elemento-' + (i + 1));
+      const text = String(item.text || '').trim().slice(0, 240);
+      const groupId = String(item.groupId || '');
+      if (!text || !groupIds[groupId]) throw new Error('Cada elemento necesita texto y un grupo correcto.');
+      return { id: itemId, text: text, imageUrl: image_(item, itemId), groupId: groupId };
+    });
+  } else {
+    if (!Array.isArray(body.steps) || body.steps.length < 2 || body.steps.length > 30) throw new Error('Agrega entre 2 y 30 pasos.');
+    content.steps = body.steps.map(function(step, i) {
+      const stepId = unique_(step.id, 'paso-' + (i + 1));
+      const text = String(step.text || '').trim().slice(0, 240);
+      if (!text) throw new Error('Escribe el texto de cada paso.');
+      return { id: stepId, text: text, imageUrl: image_(step, stepId), order: i };
+    });
+  }
+  const mode = ['none', 'up', 'down'].includes(body.timerMode) ? body.timerMode : 'none';
+  const activity = {
+    id: id, kind: kind, title: title,
+    instructions: String(body.instructions || '').trim().slice(0, 240),
+    timerMode: mode, timeLimitSeconds: clamp_(body.timeLimitSeconds || 180, 15, 3600),
+    maxAttempts: body.maxAttempts === null ? null : clamp_(body.maxAttempts || 3, 1, 35),
+    shuffle: body.shuffle !== false, sound: body.sound !== false, scoring: true,
+    imageUrl: '', labels: []
+  };
+  Object.keys(content).forEach(function(key) { activity[key] = content[key]; });
+  const row = [id, title, JSON.stringify(activity), '', new Date()];
+  if (old) sheet.getRange(old.row, 1, 1, row.length).setValues([row]); else sheet.appendRow(row);
   return activity;
 }
 
@@ -179,9 +259,27 @@ function saveResult_(body) {
   if (!paternal || !maternal || !names) return { error: 'Inicia sesión con tu usuario y contraseña.' };
   const placements = body.placements && typeof body.placements === 'object' ? body.placements : {};
   const matches = body.matches && typeof body.matches === 'object' ? body.matches : {};
+  const answers = body.answers && typeof body.answers === 'object' ? body.answers : {};
   const safe = {};
   let correct = 0;
-  if (activity.kind === 'pairs') {
+  if (activity.kind === 'quiz') {
+    (activity.questions || []).forEach(function(question) {
+      const selected = String(answers[question.id] || '');
+      if ((question.options || []).some(function(option) { return option.id === selected; })) safe[question.id] = selected;
+      if (selected === question.correctOptionId) correct++;
+    });
+  } else if (activity.kind === 'group-sort') {
+    (activity.items || []).forEach(function(item) {
+      const selected = String(answers[item.id] || '');
+      if ((activity.groups || []).some(function(group) { return group.id === selected; })) safe[item.id] = selected;
+      if (selected === item.groupId) correct++;
+    });
+  } else if (activity.kind === 'sequence') {
+    const submittedOrder = Array.isArray(answers.order) ? answers.order.map(String) : [];
+    const correctSteps = (activity.steps || []).slice().sort(function(a, b) { return Number(a.order) - Number(b.order); });
+    correctSteps.forEach(function(step, index) { if (submittedOrder[index] === step.id) correct++; });
+    safe.order = submittedOrder.filter(function(stepId) { return correctSteps.some(function(step) { return step.id === stepId; }); });
+  } else if (activity.kind === 'pairs') {
     (activity.pairs || []).forEach(function(pair) {
       const target = String(matches[pair.id] || '').slice(0, 100);
       if ((activity.pairs || []).some(function(other) { return other.id === target; })) safe[pair.id] = target;
@@ -192,7 +290,7 @@ function saveResult_(body) {
     if (activity.labels.some(function(other) { return other.id === target; })) safe[label.id] = target;
     if (target === label.id) correct++;
   });
-  const total = activity.kind === 'pairs' ? (activity.pairs || []).length : activity.labels.length;
+  const total = activity.kind === 'pairs' ? (activity.pairs || []).length : activity.kind === 'quiz' ? (activity.questions || []).length : activity.kind === 'group-sort' ? (activity.items || []).length : activity.kind === 'sequence' ? (activity.steps || []).length : activity.labels.length;
   const grade = Math.round((correct / Math.max(total, 1)) * 100) / 10;
   const elapsed = clamp_(body.elapsedSeconds || 0, 0, 86400);
   const remaining = body.remainingSeconds === null || body.remainingSeconds === undefined ? '' : clamp_(body.remainingSeconds, 0, 86400);
@@ -290,7 +388,9 @@ function getActivity_(id) {
     const activity = row.config;
     if (activity.archivedAt) return { error: 'La actividad fue archivada.' };
     if (activity.maxAttempts === undefined) activity.maxAttempts = 3;
-    activity.instructions = activity.kind === 'pairs' ? (activity.instructions || 'Arrastra cada elemento junto a su pareja. En celular, toca un elemento y después su pareja.') : 'Arrastra y suelta las chinchetas en su lugar correcto de la imagen.';
+    if (activity.kind === 'pairs') activity.instructions = activity.instructions || 'Arrastra cada elemento junto a su pareja. En celular, toca un elemento y después su pareja.';
+    else if (activity.kind === 'diagram' || !activity.kind) activity.instructions = 'Arrastra y suelta las chinchetas en su lugar correcto de la imagen.';
+    else activity.instructions = activity.instructions || 'Resuelve la actividad.';
     return activity;
   }
   catch (_) { return { error: 'La actividad guardada está dañada.' }; }
@@ -304,7 +404,9 @@ function listActivities_() {
       const activity = JSON.parse(row[2]);
       if (activity.archivedAt) return null;
       if (activity.maxAttempts === undefined) activity.maxAttempts = 3;
-      activity.instructions = activity.kind === 'pairs' ? 'Une cada elemento con su pareja.' : 'Arrastra y suelta las chinchetas en su lugar correcto de la imagen.';
+      if (activity.kind === 'pairs') activity.instructions = activity.instructions || 'Une cada elemento con su pareja.';
+      else if (activity.kind === 'diagram' || !activity.kind) activity.instructions = 'Arrastra y suelta las chinchetas en su lugar correcto de la imagen.';
+      else activity.instructions = activity.instructions || 'Resuelve la actividad.';
       return activity;
     } catch (_) { return null; }
   }).filter(Boolean).reverse();
