@@ -128,7 +128,7 @@ function saveActivity_(body) {
 }
 
 function savePairActivity_(body, id, title) {
-  if (!Array.isArray(body.pairs) || body.pairs.length < 2 || body.pairs.length > 10) throw new Error('Agrega entre 2 y 10 parejas.');
+  if (!Array.isArray(body.pairs) || body.pairs.length < 3 || body.pairs.length > 30) throw new Error('Agrega entre 3 y 30 parejas.');
   const old = findActivityRow_(spreadsheet_().getSheetByName(TAB_ACTIVITIES), id);
   const seen = {};
   const pairs = body.pairs.map(function(pair, index) {
