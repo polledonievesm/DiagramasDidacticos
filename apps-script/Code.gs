@@ -56,6 +56,7 @@ function doPost(e) {
     let result;
     if (body.action === 'submit') result = saveResult_(body);
     else if (body.action === 'saveActivity') result = saveActivity_(body);
+    else if (body.action === 'archiveActivity') result = archiveActivity_(body);
     else if (body.action === 'saveStudents') result = saveStudents_(body);
     else if (body.action === 'studentLogin') result = studentLogin_(body);
     else if (body.action === 'resetStudentPassword') result = resetStudentPassword_(body);
@@ -268,12 +269,26 @@ function saveImage_(dataUrl, activityId) {
   return 'https://drive.google.com/uc?export=view&id=' + file.getId();
 }
 
+function archiveActivity_(body) {
+  if (!authorized_(body.key)) throw new Error('Clave del maestro incorrecta.');
+  const id = String(body.id || '').slice(0, 100);
+  const sheet = spreadsheet_().getSheetByName(TAB_ACTIVITIES);
+  const row = findActivityRow_(sheet, id);
+  if (!row) throw new Error('No se encontró la actividad.');
+  const activity = row.config;
+  activity.archivedAt = new Date().toISOString();
+  sheet.getRange(row.row, 3).setValue(JSON.stringify(activity));
+  sheet.getRange(row.row, 5).setValue(new Date());
+  return { ok: true, id: id };
+}
+
 function getActivity_(id) {
   const sheet = spreadsheet_().getSheetByName(TAB_ACTIVITIES);
   const row = findActivityRow_(sheet, id);
   if (!row) return { error: 'No se encontró la actividad.' };
   try {
     const activity = row.config;
+    if (activity.archivedAt) return { error: 'La actividad fue archivada.' };
     if (activity.maxAttempts === undefined) activity.maxAttempts = 3;
     activity.instructions = activity.kind === 'pairs' ? (activity.instructions || 'Arrastra cada elemento junto a su pareja. En celular, toca un elemento y después su pareja.') : 'Arrastra y suelta las chinchetas en su lugar correcto de la imagen.';
     return activity;
@@ -287,6 +302,7 @@ function listActivities_() {
   return sheet.getRange(2, 1, sheet.getLastRow() - 1, 3).getValues().map(function(row) {
     try {
       const activity = JSON.parse(row[2]);
+      if (activity.archivedAt) return null;
       if (activity.maxAttempts === undefined) activity.maxAttempts = 3;
       activity.instructions = activity.kind === 'pairs' ? 'Une cada elemento con su pareja.' : 'Arrastra y suelta las chinchetas en su lugar correcto de la imagen.';
       return activity;
