@@ -75,6 +75,7 @@ function routeGet_(p) {
   if (action === 'loginResult') return loginResult_(String(p.requestId || ''));
   if (action === 'attempts') return attemptInfo_(String(p.activityId || 'digestivo-inicial'), p.paternalSurname, p.maternalSurname, p.givenNames, p.studentToken);
   if (action === 'leaderboard') return leaderboard_(String(p.activityId || 'digestivo-inicial'));
+  if (action === 'capabilities') return { apiVersion: 3, kinds: ['diagram', 'pairs', 'quiz', 'group-sort', 'sequence', 'flashcards', 'memory', 'complete-sentence', 'word-order'] };
   if (!authorized_(p.key)) return { error: 'Clave del maestro incorrecta.' };
   if (action === 'activities') return listActivities_();
   if (action === 'results') return listResults_();
