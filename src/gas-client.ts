@@ -39,7 +39,11 @@ export function rememberTeacherKey(value: string, username = "") {
   if (username) localStorage.setItem(TEACHER_USERNAME_KEY, username);
 }
 
-export function getTeacherUsername() { return localStorage.getItem(TEACHER_USERNAME_KEY) || "Maestro"; }
+export function getTeacherUsername() {
+  const username = localStorage.getItem(TEACHER_USERNAME_KEY)?.trim();
+  // «maestra» is the legacy sign-in ID; show Michel's preferred account name in the interface.
+  return !username || username.toLocaleLowerCase("es-MX") === "maestra" ? "michelotaner" : username;
+}
 
 export function forgetTeacherKey() {
   teacherKeyNames.forEach(name => {
