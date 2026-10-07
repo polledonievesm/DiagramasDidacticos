@@ -82,3 +82,7 @@
 .access-card>p{color:#728078;line-height:1.5}
 .access-card>.primary{width:100%;margin-top:7px;background:#5e9b78}
 @media(max-width:700px){.am-design-controls{grid-template-columns:1fr 1fr}.am-design-controls>label:first-child{grid-column:1/-1}.am-design-controls>button{grid-column:1/-1}.credential-selection-head{align-items:flex-start}.credential-check-list{grid-template-columns:1fr}.am-card-image{max-height:210px}}
+
+/* Keep the active create control readable on its green background. */
+.am-top-nav>.am-nav-create,.am-top-nav>.am-nav-create:hover,.am-top-nav>.am-nav-create.active{color:#fff;background:#267653;box-shadow:none}
+.am-top-nav>.am-nav-create:hover{background:#1f6245}
