@@ -35,6 +35,8 @@ export type Activity = {
   maxAttempts: number | null;
   availableFrom?: string | null;
   availableUntil?: string | null;
+  coverImageUrl?: string | null;
+  cardTheme?: "mint" | "sky" | "lilac" | "peach";
   imageUrl: string;
   imageKey?: string | null;
   labels: DigestiveLabel[];
