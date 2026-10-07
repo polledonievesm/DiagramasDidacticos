@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import type { Activity } from "./default-activity";
 import { templateRegistry } from "./template-registry";
-import { apiRequest, forgetTeacherKey, getTeacherKey, rememberTeacherKey } from "./gas-client";
+import { apiRequest, forgetTeacherKey, getTeacherKey, getTeacherUsername, logoutTeacher, rememberTeacherKey } from "./gas-client";
+import { activityCover, activityTheme } from "./activity-visual";
 import "./activity-manager.css";
 
 function editorUrl(activity?: Activity, templateId = "diagram-labels", duplicate = false) {
@@ -77,7 +78,7 @@ export default function ActivityManager() {
   const [initialCache] = useState(readPanelCache);
   const [initialReportCache] = useState(readReportCache);
   const [key, setKey] = useState(getTeacherKey);
-  const [draftKey, setDraftKey] = useState("");
+  const [draftCredentials, setDraftCredentials] = useState({ username: "", password: "" });
   const [activities, setActivities] = useState<Activity[]>(() => initialCache?.activities || []);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
@@ -90,6 +91,8 @@ export default function ActivityManager() {
   const [supportedKinds, setSupportedKinds] = useState<string[]>(() => initialCache?.supportedKinds || ["diagram","pairs"]);
   const [availabilityValues, setAvailabilityValues] = useState<Record<string, { from: string; until: string }>>({});
   const [savingDeadline, setSavingDeadline] = useState("");
+  const [designDrafts, setDesignDrafts] = useState<Record<string, { theme: "mint" | "sky" | "lilac" | "peach"; imageData?: string }>>({});
+  const [savingDesign, setSavingDesign] = useState("");
 
   async function loadActivities(accessKey: string) {
     const headers = { "x-teacher-key": accessKey };
@@ -163,16 +166,24 @@ export default function ActivityManager() {
     }
   }, [key, view]);
 
-  function enter(event: React.FormEvent) {
+  async function enter(event: React.FormEvent) {
     event.preventDefault();
     setBusy(true);
-    setNotice("Conectando con tu hoja…");
-    // Open the teacher panel immediately. A slow Sheets request must never send
-    // the teacher back to the password form after a successful local sign-in.
-    rememberTeacherKey(draftKey);
-    setKey(draftKey);
-    setReady(true);
-    void loadActivities(draftKey).catch(handlePanelError).finally(() => setBusy(false));
+    setNotice("Verificando el acceso docente…");
+    try {
+      const response = await apiRequest("/api/teacher/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(draftCredentials) });
+      const data = await response.json();
+      if (!response.ok || !data.token) throw new Error(data.error || "Usuario o contraseña incorrectos.");
+      const accessToken = String(data.token);
+      rememberTeacherKey(accessToken, String(data.username || draftCredentials.username));
+      setKey(accessToken);
+      setDraftCredentials({ username: "", password: "" });
+      setReady(false);
+      setNotice("Sesión iniciada. Cargando tus actividades…");
+      await loadActivities(accessToken);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "No se pudo iniciar sesión.");
+    } finally { setBusy(false); }
   }
 
   async function refresh() {
@@ -252,14 +263,39 @@ export default function ActivityManager() {
     finally { setSavingDeadline(""); }
   }
 
-  if (!ready && key) return <main className="activity-manager-page"><header className="am-header"><a href="./">Aula en juego</a><span>Panel del maestro</span></header><section className="am-login"><span className="am-kicker">SESIÓN DOCENTE</span><h1>{notice ? "No se pudo cargar el panel" : "Cargando tus actividades…"}</h1><p>{notice || "Estamos conectando con tu hoja privada. No necesitas volver a escribir la clave."}</p>{notice&&<p className="am-notice" role="status">{notice}</p>}<button className="am-primary" disabled={busy} onClick={()=>{setBusy(true);setNotice("");void loadActivities(key).catch(handlePanelError).finally(()=>setBusy(false));}}>{busy?"Conectando…":"Reintentar"}</button><button className="am-secondary-button" onClick={()=>{forgetTeacherKey();setKey("");setDraftKey("");}}>Cerrar sesión</button></section></main>;
-  if (!ready) return <main className="activity-manager-page"><header className="am-header"><a href="./">Aula en juego</a><span>Panel del maestro</span></header><form className="am-login" onSubmit={enter}><span className="am-kicker">ESPACIO DOCENTE</span><h1>Mis actividades</h1><p>Administra tus juegos y comparte el enlace con tus alumnos.</p><label>Clave del maestro<input autoComplete="current-password" type="password" required value={draftKey} onChange={event => setDraftKey(event.target.value)}/></label>{notice&&<p className="am-notice">{notice}</p>}<button className="am-primary" disabled={busy}>{busy?"Conectando…":"Entrar al panel"}</button><a href="./">Volver al inicio</a></form></main>;
+  function chooseCover(activityId: string, file?: File, currentTheme: "mint" | "sky" | "lilac" | "peach" = "mint") {
+    if (!file) return;
+    if (!/^image\/(png|jpeg|webp)$/.test(file.type)) { setNotice("Elige una imagen PNG, JPG o WebP."); return; }
+    if (file.size > 5 * 1024 * 1024) { setNotice("La imagen debe pesar menos de 5 MB."); return; }
+    const reader = new FileReader();
+    reader.onload = () => setDesignDrafts(old => ({ ...old, [activityId]: { theme: old[activityId]?.theme || currentTheme, imageData: String(reader.result) } }));
+    reader.readAsDataURL(file);
+  }
+
+  async function saveDesign(activity: Activity) {
+    const draft = designDrafts[activity.id] || { theme: activityTheme(activity) };
+    setSavingDesign(activity.id); setNotice("");
+    try {
+      const response = await apiRequest("/api/teacher/activity-design", { method: "POST", headers: { "Content-Type": "application/json", "x-teacher-key": key }, body: JSON.stringify({ id: activity.id, theme: draft.theme, imageData: draft.imageData || "" }) });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "No se pudo guardar la imagen y el diseño.");
+      const updated = activities.map(item => item.id === activity.id ? { ...item, coverImageUrl: data.coverImageUrl || item.coverImageUrl || item.imageUrl, cardTheme: data.cardTheme } : item);
+      setActivities(updated);
+      sessionStorage.setItem(PANEL_CACHE_KEY, JSON.stringify({ savedAt: Date.now(), activities: updated, supportedKinds }));
+      setDesignDrafts(old => { const next = { ...old }; delete next[activity.id]; return next; });
+      setNotice("Se guardó el diseño. La misma imagen aparecerá en el panel del maestro y en el del alumno.");
+    } catch (error) { setNotice(error instanceof Error ? error.message : "No se pudo guardar el diseño."); }
+    finally { setSavingDesign(""); }
+  }
+
+  if (!ready && key) return <main className="activity-manager-page"><header className="am-header"><a href="./">Aula en juego</a><span>Panel del maestro</span></header><section className="am-login"><span className="am-kicker">SESIÓN DOCENTE</span><h1>{notice ? "No se pudo cargar el panel" : "Cargando tus actividades…"}</h1><p>{notice || "Estamos conectando con tu hoja privada. Tu sesión permanece iniciada."}</p>{notice&&<p className="am-notice" role="status">{notice}</p>}<button className="am-primary" disabled={busy} onClick={()=>{setBusy(true);setNotice("");void loadActivities(key).catch(handlePanelError).finally(()=>setBusy(false));}}>{busy?"Conectando…":"Reintentar"}</button><button className="am-secondary-button" onClick={()=>{void logoutTeacher();setKey("");setDraftCredentials({username:"",password:""});}}>Cerrar sesión</button></section></main>;
+  if (!ready) return <main className="activity-manager-page"><header className="am-header"><a href="./">Aula en juego</a><span>Panel del maestro</span></header><form className="am-login" onSubmit={enter}><span className="am-kicker">ESPACIO DOCENTE</span><h1>Mis actividades</h1><p>Administra tus juegos y comparte el enlace con tus alumnos.</p><label>Nombre de usuario<input autoComplete="username" required value={draftCredentials.username} onChange={event => setDraftCredentials({ ...draftCredentials, username: event.target.value })}/></label><label>Contraseña<input autoComplete="current-password" type="password" required value={draftCredentials.password} onChange={event => setDraftCredentials({ ...draftCredentials, password: event.target.value })}/></label>{notice&&<p className="am-notice">{notice}</p>}<button className="am-primary" disabled={busy}>{busy?"Conectando…":"Entrar al panel"}</button><a href="./">Volver al inicio</a></form></main>;
 
   const available = templateRegistry.filter(template => template.status === "ready" && supportedKinds.includes(template.id === "diagram-labels" ? "diagram" : template.id));
   const planned = templateRegistry.filter(template => template.status !== "ready");
 
   return <main className="activity-manager-page">
-    <header className="am-header"><a href="./"><span className="am-logo">A</span>Aula en juego</a><nav className="am-top-nav"><a className={view === "activities" ? "active" : ""} href="?panel=actividades">Mis actividades</a><a className={view === "results" ? "active" : ""} href="?panel=resultados">Mis resultados</a><a href="?panel=alumnos">Mis alumnos</a><a className={`am-nav-create ${section === "create" ? "active" : ""}`} href="?panel=actividades&seccion=crear">Crear actividad</a><div className="am-account"><button aria-expanded={accountOpen} onClick={() => setAccountOpen(open => !open)}>Docente <span aria-hidden="true">⌄</span></button>{accountOpen&&<div className="am-account-menu"><strong>Sesión docente</strong><button onClick={()=>{forgetTeacherKey();setKey("");setReady(false);setDraftKey("");setAccountOpen(false);}}>Cerrar sesión</button></div>}</div></nav></header>
+    <header className="am-header"><a href="./"><span className="am-logo">A</span>Aula en juego</a><nav className="am-top-nav"><a className={view === "activities" ? "active" : ""} href="?panel=actividades">Mis actividades</a><a className={view === "results" ? "active" : ""} href="?panel=resultados">Mis resultados</a><a href="?panel=alumnos">Mis alumnos</a><a className={`am-nav-create ${section === "create" ? "active" : ""}`} href="?panel=actividades&seccion=crear">Crear actividad</a><div className="am-account"><button aria-expanded={accountOpen} onClick={() => setAccountOpen(open => !open)}>{getTeacherUsername()} <span aria-hidden="true">⌄</span></button>{accountOpen&&<div className="am-account-menu"><strong>Sesión docente</strong><button onClick={()=>{void logoutTeacher();setKey("");setReady(false);setDraftCredentials({username:"",password:""});setAccountOpen(false);}}>Cerrar sesión</button></div>}</div></nav></header>
     <section className="am-main">
       {view === "results" ? <section className="am-list am-results-panel">
         <div className="am-list-heading"><div><span className="am-kicker">REGISTRO DEL GRUPO</span><h1>Mis resultados</h1><p>Consulta el avance de cada alumno por actividad.</p></div><button className="am-refresh" onClick={()=>void refresh()} disabled={busy}>Actualizar resultados</button></div>
@@ -275,7 +311,7 @@ export default function ActivityManager() {
       <div className="am-heading"><div><span className="am-kicker">TU ESPACIO DE TRABAJO</span><h1>Mis actividades</h1><p>Abre, edita y comparte las actividades que has creado.</p></div><div className="am-heading-actions"><button className="am-refresh" onClick={()=>void refresh()} disabled={busy}>Actualizar lista</button><a className="am-primary" href="?panel=actividades&seccion=crear">＋ Crear actividad</a></div></div>
       {notice&&<p className="am-notice" role="status">{notice}</p>}
             <section className="am-list"><div className="am-list-heading"><div><span className="am-kicker">GUARDADAS EN TU HOJA</span><h2>Actividades</h2><p>Configura cuándo deja de estar disponible cada actividad.</p></div><span>{activities.length} {activities.length===1?"actividad":"actividades"}</span></div>
-        {!activities.length?<div className="am-empty">Todavía no hay actividades guardadas. Usa «Crear actividad» para elegir un juego.</div>:<div className="am-activity-grid">{activities.map(activity=>{const definition=templateRegistry.find(item=>item.id===(activity.kind==="diagram"||!activity.kind?"diagram-labels":activity.kind));return <article className="am-activity-card" key={activity.id}><div className="am-card-top"><span>{definition?.title||"Actividad"}</span><button aria-label={"Compartir "+activity.title} onClick={()=>void share(activity)}>{copied===activity.id?"Enlace copiado ✓":"Compartir ↗"}</button></div><h3>{activity.title}</h3><p>{activity.kind==="pairs"||activity.kind==="memory"||activity.kind==="flashcards"?((activity.pairs||[]).length+(activity.kind==="memory"?" parejas":" tarjetas")):["quiz","quiz-show","true-false"].includes(activity.kind||"")?((activity.questions||[]).length+" preguntas"):activity.kind==="group-sort"?((activity.items||[]).length+" elementos"):activity.kind==="sequence"?((activity.steps||[]).length+" pasos"):(activity.kind==="complete-sentence"||activity.kind==="complete-phrase")?((activity.sentences||[]).length+" frases"):activity.kind==="word-order"?((activity.wordSentences||[]).length+" oraciones"):activity.kind==="roulette"?((activity.wheelEntries||[]).length+" retos"):activity.kind==="word-search"?((activity.wordSearchWords||[]).length+" palabras"):((activity.labels||[]).length+" etiquetas")}</p><div className="am-deadline"><label>Se activa<input type="datetime-local" value={(availabilityValues[activity.id]??{from:localDateTime(activity.availableFrom),until:localDateTime(activity.availableUntil)}).from} onChange={event=>setAvailabilityValues(old=>({...old,[activity.id]:{from:event.target.value,until:(old[activity.id]??{from:localDateTime(activity.availableFrom),until:localDateTime(activity.availableUntil)}).until}}))}/></label><label>Finaliza<input type="datetime-local" value={(availabilityValues[activity.id]??{from:localDateTime(activity.availableFrom),until:localDateTime(activity.availableUntil)}).until} onChange={event=>setAvailabilityValues(old=>({...old,[activity.id]:{from:(old[activity.id]??{from:localDateTime(activity.availableFrom),until:localDateTime(activity.availableUntil)}).from,until:event.target.value}}))}/></label><button onClick={()=>void saveDeadline(activity)} disabled={savingDeadline===activity.id}>{savingDeadline===activity.id?"Guardando…":"Guardar periodo"}</button><small>{activity.availableFrom?`Activa ${new Date(activity.availableFrom).toLocaleString("es-MX")}`:"Activa de inmediato"} · {activity.availableUntil?`Finaliza ${new Date(activity.availableUntil).toLocaleString("es-MX")}`:"Sin fecha de cierre"}</small></div><div className="am-card-actions"><a href={editorUrl(activity)}>Editar</a><a href={"?panel=resultados&actividad="+encodeURIComponent(activity.id)}>Reporte</a><button onClick={()=>void duplicate(activity)} disabled={busy}>Duplicar</button>{activity.kind==="pairs"&&supportedKinds.includes("memory")&&<button onClick={()=>void convert(activity,"memory")} disabled={busy}>Crear como memorama</button>}{activity.kind==="pairs"&&supportedKinds.includes("flashcards")&&<button onClick={()=>void convert(activity,"flashcards")} disabled={busy}>Crear como tarjetas</button>}<button className="am-archive" onClick={()=>void archive(activity)} disabled={busy}>Eliminar</button></div></article>})}</div>}
+        {!activities.length?<div className="am-empty">Todavía no hay actividades guardadas. Usa «Crear actividad» para elegir un juego.</div>:<div className="am-activity-grid">{activities.map(activity=>{const definition=templateRegistry.find(item=>item.id===(activity.kind==="diagram"||!activity.kind?"diagram-labels":activity.kind));const design=designDrafts[activity.id]||{theme:activityTheme(activity)};const preview=design.imageData||activityCover(activity);return <article className={`am-activity-card theme-${design.theme}`} key={activity.id}><div className="am-card-image">{preview?<img src={preview} alt={`Imagen de ${activity.title}`} />:<span className="am-image-placeholder">Aula en juego</span>}</div><div className="am-card-top"><span>{definition?.title||"Actividad"}</span><button aria-label={"Compartir "+activity.title} onClick={()=>void share(activity)}>{copied===activity.id?"Enlace copiado ✓":"Compartir ↗"}</button></div><h3>{activity.title}</h3><p>{activity.kind==="pairs"||activity.kind==="memory"||activity.kind==="flashcards"?((activity.pairs||[]).length+(activity.kind==="memory"?" parejas":" tarjetas")):["quiz","quiz-show","true-false"].includes(activity.kind||"")?((activity.questions||[]).length+" preguntas"):activity.kind==="group-sort"?((activity.items||[]).length+" elementos"):activity.kind==="sequence"?((activity.steps||[]).length+" pasos"):(activity.kind==="complete-sentence"||activity.kind==="complete-phrase")?((activity.sentences||[]).length+" frases"):activity.kind==="word-order"?((activity.wordSentences||[]).length+" oraciones"):activity.kind==="roulette"?((activity.wheelEntries||[]).length+" retos"):activity.kind==="word-search"?((activity.wordSearchWords||[]).length+" palabras"):((activity.labels||[]).length+" etiquetas")}</p><div className="am-design-controls"><label>Imagen que verá el alumno<input type="file" accept="image/png,image/jpeg,image/webp" onChange={event=>chooseCover(activity.id,event.target.files?.[0],activityTheme(activity))}/><small>La misma imagen se muestra aquí y en el panel del alumno.</small></label><label>Color de la tarjeta<select value={design.theme} onChange={event=>setDesignDrafts(old=>({...old,[activity.id]:{...old[activity.id],theme:event.target.value as "mint"|"sky"|"lilac"|"peach"}}))}><option value="mint">Menta</option><option value="sky">Azul cielo</option><option value="lilac">Lavanda</option><option value="peach">Durazno</option></select></label><button onClick={()=>void saveDesign(activity)} disabled={savingDesign===activity.id}>{savingDesign===activity.id?"Guardando…":"Guardar diseño"}</button></div><div className="am-deadline"><label>Se activa<input type="datetime-local" value={(availabilityValues[activity.id]??{from:localDateTime(activity.availableFrom),until:localDateTime(activity.availableUntil)}).from} onChange={event=>setAvailabilityValues(old=>({...old,[activity.id]:{from:event.target.value,until:(old[activity.id]??{from:localDateTime(activity.availableFrom),until:localDateTime(activity.availableUntil)}).until}}))}/></label><label>Finaliza<input type="datetime-local" value={(availabilityValues[activity.id]??{from:localDateTime(activity.availableFrom),until:localDateTime(activity.availableUntil)}).until} onChange={event=>setAvailabilityValues(old=>({...old,[activity.id]:{from:(old[activity.id]??{from:localDateTime(activity.availableFrom),until:localDateTime(activity.availableUntil)}).from,until:event.target.value}}))}/></label><button onClick={()=>void saveDeadline(activity)} disabled={savingDeadline===activity.id}>{savingDeadline===activity.id?"Guardando…":"Guardar periodo"}</button><small>{activity.availableFrom?`Activa ${new Date(activity.availableFrom).toLocaleString("es-MX")}`:"Activa de inmediato"} · {activity.availableUntil?`Finaliza ${new Date(activity.availableUntil).toLocaleString("es-MX")}`:"Sin fecha de cierre"}</small></div><div className="am-card-actions"><a href={editorUrl(activity)}>Editar</a><a href={"?panel=resultados&actividad="+encodeURIComponent(activity.id)}>Reporte</a><button onClick={()=>void duplicate(activity)} disabled={busy}>Duplicar</button>{activity.kind==="pairs"&&supportedKinds.includes("memory")&&<button onClick={()=>void convert(activity,"memory")} disabled={busy}>Crear como memorama</button>}{activity.kind==="pairs"&&supportedKinds.includes("flashcards")&&<button onClick={()=>void convert(activity,"flashcards")} disabled={busy}>Crear como tarjetas</button>}<button className="am-archive" onClick={()=>void archive(activity)} disabled={busy}>Eliminar</button></div></article>})}</div>}
         <p className="am-footnote">Eliminar archiva la actividad de esta lista. Los resultados anteriores se conservan.</p>
       </section>
       </>}
