@@ -24,7 +24,7 @@ function readImage(file?:File){return new Promise<string>((resolve,reject)=>{if(
 export default function TemplateGame({kind}:Props){
  const isQuestionGame=["quiz","quiz-show","true-false"].includes(kind);
  const isTrueFalse=kind==="true-false";
- const [screen,setScreen]=useState<"loading"|"teacher-key"|"teacher"|"login"|"play"|"contest-intro"|"result"|"unsupported">("loading");
+ const [screen,setScreen]=useState<"loading"|"teacher-key"|"teacher"|"teacher-error"|"login"|"play"|"contest-intro"|"result"|"unsupported">("loading");
  const [activity,setActivity]=useState<Activity>(()=>blank(kind));
  const [draft,setDraft]=useState<Activity>(()=>blank(kind));
  const [teacherKey,setTeacherKey]=useState(getTeacherKey());
@@ -70,7 +70,7 @@ export default function TemplateGame({kind}:Props){
     if(savedId)await loadSaved(savedId);
     else if(q.get("nueva")==="1"){const fresh=blank(kind);setDraft(fresh);setActivity(fresh)}
     setScreen("teacher")
-   }).catch(e=>{forgetTeacherKey();setNotice(e instanceof Error?e.message:"No se pudo cargar el editor.");setScreen("teacher-key")});
+   }).catch(e=>{setNotice(e instanceof Error?e.message:"No se pudo cargar el editor.");setScreen("teacher-error")});
    return;
   }
   const activityId=q.get("actividad");
@@ -107,6 +107,7 @@ export default function TemplateGame({kind}:Props){
  }
  async function start(profile:Student|null=student,token=studentToken){
   if(!activity.id||!profile||!token)return;
+  if(playTotal===0){setNotice("Esta actividad todavía no tiene contenido. El maestro debe terminar de configurarla antes de compartirla.");return;}
   setBusy(true);setNotice("");
   try{
    const query=new URLSearchParams({activityId:activity.id,studentToken:token,paternalSurname:profile.paternalSurname,maternalSurname:profile.maternalSurname,givenNames:profile.givenNames});
@@ -157,6 +158,8 @@ export default function TemplateGame({kind}:Props){
   </article>;
  }
 
+ if(screen==="loading")return <main className="tg-page" aria-live="polite"><section className="tg-login"><span className="tg-kicker">AULA EN JUEGO</span><h1>Abriendo {title.toLocaleLowerCase("es-MX")}</h1><p>Estamos cargando el editor o la actividad. Esto puede tardar unos segundos.</p></section></main>;
+ if(screen==="teacher-error")return <main className="tg-page"><section className="tg-login"><span className="tg-kicker">NO SE PUDO CARGAR</span><h1>{title}</h1><p>{notice}</p><button className="tg-primary" onClick={()=>location.reload()}>Reintentar</button><a href="./?panel=actividades">Volver a Mis actividades</a></section></main>;
  if(screen==="unsupported")return <main className="tg-page"><section className="tg-login"><span className="tg-kicker">PLANTILLA EN PREPARACIÓN</span><h1>{title}</h1><p>{notice}</p><a href="./?panel=actividades">Volver a Mis actividades</a></section></main>;
  if(screen==="teacher-key")return <main className="tg-page"><header className="tg-header"><a href="./">Aula en juego</a><a href="?panel=actividades">Mis actividades</a></header><form className="tg-login" onSubmit={teacherEnter}><span className="tg-kicker">EDITOR DE ACTIVIDAD · {title.toLocaleUpperCase("es-MX")}</span><h1>Acceso del maestro</h1><p>Ingresa la clave para crear o editar una actividad.</p><label>Clave del maestro<input type="password" required value={keyDraft} onChange={e=>setKeyDraft(e.target.value)}/></label>{notice&&<p className="tg-notice">{notice}</p>}<button className="tg-primary" disabled={busy}>{busy?"Conectando…":"Continuar al editor"}</button></form></main>;
 
@@ -178,5 +181,6 @@ export default function TemplateGame({kind}:Props){
  {kind==="sequence"&&<div className="tg-sequence">{order.map((step,index)=><article key={step.id}><span>{index+1}</span>{(step.imageUrl||step.imageData)&&<img src={step.imageData||step.imageUrl||""} alt=""/>}<strong>{step.text}</strong><div><button aria-label="Subir paso" disabled={index===0} onClick={()=>moveStep(index,-1)}>↑</button><button aria-label="Bajar paso" disabled={index===order.length-1} onClick={()=>moveStep(index,1)}>↓</button></div></article>)}</div>}
  {notice&&<p className="tg-notice">{notice}</p>}<button className="tg-primary tg-finish" disabled={busy} onClick={()=>void finish()}>{busy?"Guardando…":"Terminar y calificar"}</button></section></main>;
 
- return <main className="tg-page"><section className="tg-result"><span className="tg-kicker">RESULTADO</span><h1>{score?.timedOut?"Se acabó el tiempo":"Actividad terminada"}</h1><div className="tg-grade">{score?.grade??0}<small> / 10</small></div><p>{score?.correct??0} de {score?.total??playTotal} respuestas correctas.</p><p>Tiempo: {fmt(score?.elapsedSeconds??seconds)}{score?.remainingSeconds!==null&&score?.remainingSeconds!==undefined?" · Te sobraron "+fmt(score.remainingSeconds):""}</p><div className="tg-notice">{score?.attemptsRemaining===null?"Intentos ilimitados.":score?.attemptsRemaining===1?"Te queda 1 intento.":"Te quedan "+(score?.attemptsRemaining??0)+" intentos."}</div>{score&&(score.attemptsRemaining===null||score.attemptsRemaining>0)&&<button className="tg-primary" onClick={()=>{setScreen("login");setScore(null)}}>Intentar de nuevo</button>}<a href="./?panel=actividades">Volver al inicio</a></section></main>;
+ if(screen==="result")return <main className="tg-page"><section className="tg-result"><span className="tg-kicker">RESULTADO</span><h1>{score?.timedOut?"Se acabó el tiempo":"Actividad terminada"}</h1><div className="tg-grade">{score?.grade??0}<small> / 10</small></div><p>{score?.correct??0} de {score?.total??playTotal} respuestas correctas.</p><p>Tiempo: {fmt(score?.elapsedSeconds??seconds)}{score?.remainingSeconds!==null&&score?.remainingSeconds!==undefined?" · Te sobraron "+fmt(score.remainingSeconds):""}</p><div className="tg-notice">{score?.attemptsRemaining===null?"Intentos ilimitados.":score?.attemptsRemaining===1?"Te queda 1 intento.":"Te quedan "+(score?.attemptsRemaining??0)+" intentos."}</div>{score&&(score.attemptsRemaining===null||score.attemptsRemaining>0)&&<button className="tg-primary" onClick={()=>{setScreen("login");setScore(null)}}>Intentar de nuevo</button>}<a href="./?panel=actividades">Volver al inicio</a></section></main>;
+ return <main className="tg-page" aria-live="polite"><section className="tg-login"><h1>Abriendo actividad…</h1><p>{notice||"Espera mientras cargamos el contenido."}</p></section></main>;
 }
