@@ -8,7 +8,7 @@ import Catalog from "./Catalog";
 type Screen = "catalog" | "intro" | "play" | "result" | "teacher";
 type Result = { correct: number; total: number; grade: number; elapsedSeconds: number; remainingSeconds: number | null; timedOut: boolean; attemptsUsed: number; attemptsRemaining: number | null; maxAttempts: number | null };
 type Leader = { rank: number; name: string; paternalSurname: string; grade: number; attempts: number };
-type Attempt = { id: number; activity_id: string; paternal_surname: string; maternal_surname: string; given_names: string; correct: number; total: number; grade: number; elapsed_seconds: number; remaining_seconds: number | null; timed_out: number; submitted_at: string };
+type Attempt = { id: number; activity_id: string; student_id?: string; paternal_surname: string; maternal_surname: string; given_names: string; correct: number; total: number; grade: number; elapsed_seconds: number; remaining_seconds: number | null; timed_out: number; submitted_at: string };
 type StudentAccount = { id: string; paternal_surname: string; maternal_surname: string; given_names: string; username: string; active: boolean; password_version?: string };
 type CredentialCard = { id?: string; paternalSurname: string; maternalSurname: string; givenNames: string; username: string; password: string };
 const palette = ["#2789e8", "#d849cc", "#fa7a16", "#18884a", "#a739cc", "#ef563f", "#2548d8", "#13a783", "#d17b18", "#e52e45"];
