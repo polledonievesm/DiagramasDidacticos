@@ -15,6 +15,7 @@ function setupMigration() {
   getOrCreateSheet_(sheetFile, TAB_STUDENTS, STUDENT_HEADERS);
   ensureDeadlineSheet_(sheetFile);
   ensureTokenSecret_();
+  const firstTeacherPassword = ensureTeacherLogin_();
 
   let folderId = props.getProperty('DRIVE_FOLDER_ID');
   if (!folderId) {
@@ -35,7 +36,10 @@ function setupMigration() {
   }
 
   Logger.log('Panel de resultados: ' + sheetFile.getUrl());
-  Logger.log('Clave inicial del maestro (guárdala): ' + pin);
+  if (firstTeacherPassword) {
+    Logger.log('Acceso docente nuevo — usuario: maestra');
+    Logger.log('Contraseña temporal del maestro (guárdala; no volverá a mostrarse): ' + firstTeacherPassword);
+  }
   Logger.log('Carpeta de imágenes creada. ID: ' + folderId);
   Logger.log('Después, implementa el proyecto como Aplicación web y copia la URL /exec en config.js.');
 }
@@ -61,10 +65,13 @@ function doPost(e) {
     else if (body.action === 'archiveActivity') result = archiveActivity_(body);
     else if (body.action === 'saveStudents') result = saveStudents_(body);
     else if (body.action === 'studentLogin') result = studentLogin_(body);
+    else if (body.action === 'teacherLogin') result = teacherLogin_(body);
+    else if (body.action === 'teacherLogout') result = teacherLogout_(body);
     else if (body.action === 'resetStudentPassword') result = resetStudentPassword_(body);
     else if (body.action === 'setStudentActive') result = setStudentActive_(body);
     else if (body.action === 'deleteStudent') result = deleteStudent_(body);
     else if (body.action === 'setActivityDeadline') result = setActivityDeadline_(body);
+    else if (body.action === 'setActivityDesign') result = setActivityDesign_(body);
     else result = { error: 'Operación no reconocida.' };
     return output_(result, 'json');
   } catch (err) {
@@ -77,6 +84,7 @@ function routeGet_(p) {
   if (action === 'activity') return getActivity_(String(p.id || 'digestivo-inicial'));
   if (action === 'pairActivities') return listPairActivities_();
   if (action === 'loginResult') return loginResult_(String(p.requestId || ''));
+  if (action === 'teacherLoginResult') return teacherLoginResult_(String(p.requestId || ''));
   if (action === 'attempts') return attemptInfo_(String(p.activityId || 'digestivo-inicial'), p.paternalSurname, p.maternalSurname, p.givenNames, p.studentToken);
   if (action === 'leaderboard') return leaderboard_(String(p.activityId || 'digestivo-inicial'));
   if (action === 'studentPortal') return studentPortal_(String(p.studentToken || ''));
@@ -128,6 +136,8 @@ function saveActivity_(body) {
     timeLimitSeconds: clamp_(body.timeLimitSeconds || 180, 15, 3600),
     maxAttempts: body.maxAttempts === null ? null : clamp_(body.maxAttempts || 3, 1, 35),
     imageUrl: imageUrl,
+    coverImageUrl: String(body.coverImageUrl || (old && old.config.coverImageUrl) || ''),
+    cardTheme: ['mint', 'sky', 'lilac', 'peach'].indexOf(String(body.cardTheme || (old && old.config.cardTheme) || 'mint')) >= 0 ? String(body.cardTheme || (old && old.config.cardTheme) || 'mint') : 'mint',
     labels: labels
   };
   const now = new Date();
@@ -250,7 +260,8 @@ function saveTemplateActivity_(body, id, title) {
     timerMode: mode, timeLimitSeconds: clamp_(body.timeLimitSeconds || 180, 15, 3600),
     maxAttempts: body.maxAttempts === null ? null : clamp_(body.maxAttempts || 3, 1, 35),
     shuffle: body.shuffle !== false, sound: body.sound !== false, scoring: true,
-    imageUrl: '', labels: []
+    imageUrl: '', coverImageUrl: String(body.coverImageUrl || (old && old.config.coverImageUrl) || ''),
+    cardTheme: ['mint', 'sky', 'lilac', 'peach'].indexOf(String(body.cardTheme || (old && old.config.cardTheme) || 'mint')) >= 0 ? String(body.cardTheme || (old && old.config.cardTheme) || 'mint') : 'mint', labels: []
   };
   Object.keys(content).forEach(function(key) { activity[key] = content[key]; });
   const row = [id, title, JSON.stringify(activity), '', new Date()];
@@ -281,7 +292,8 @@ function savePairActivity_(body, id, title) {
     id: id, kind: 'pairs', title: title, instructions: String(body.instructions || 'Arrastra cada elemento junto a su pareja. En celular, toca un elemento y después su pareja.').trim().slice(0, 240),
     timerMode: mode, timeLimitSeconds: clamp_(body.timeLimitSeconds || 180, 15, 3600),
     maxAttempts: body.maxAttempts === null ? null : clamp_(body.maxAttempts || 3, 1, 35),
-    imageUrl: '', labels: [], pairs: pairs
+    imageUrl: '', coverImageUrl: String(body.coverImageUrl || (old && old.config.coverImageUrl) || ''),
+    cardTheme: ['mint', 'sky', 'lilac', 'peach'].indexOf(String(body.cardTheme || (old && old.config.cardTheme) || 'mint')) >= 0 ? String(body.cardTheme || (old && old.config.cardTheme) || 'mint') : 'mint', labels: [], pairs: pairs
   };
   const sheet = spreadsheet_().getSheetByName(TAB_ACTIVITIES), now = new Date();
   const row = [id, title, JSON.stringify(activity), '', now];
@@ -448,12 +460,48 @@ function studentPortal_(token) {
     }, null);
     const expired = Boolean(dueAt && new Date(dueAt).getTime() <= Date.now());
     const scheduled = Boolean(startAt && new Date(startAt).getTime() > Date.now());
-    return { id: activity.id, title: activity.title, kind: activity.kind || 'diagram', availableFrom: startAt || null, dueAt: dueAt || null,
+    return { id: activity.id, title: activity.title, instructions: activity.instructions || '', kind: activity.kind || 'diagram', imageUrl: activity.coverImageUrl || activityPreviewImage_(activity), theme: activity.cardTheme || 'mint', availableFrom: startAt || null, dueAt: dueAt || null,
       scheduled: scheduled, expired: expired, attempts: rows.length, bestGrade: best ? Number(best.grade) : null, completed: rows.length > 0 };
   });
   const grades = activities.filter(function(item) { return item.bestGrade !== null; }).map(function(item) { return Number(item.bestGrade); });
   const average = grades.length ? Math.round(grades.reduce(function(sum, grade) { return sum + grade; }, 0) / grades.length * 10) / 10 : null;
   return { student: { id: account.id, name: account.givenNames, givenNames: account.givenNames, paternalSurname: account.paternalSurname, maternalSurname: account.maternalSurname, username: account.username }, activities: activities, average: average, completedCount: grades.length };
+}
+
+function activityPreviewImage_(activity) {
+  if (activity.imageUrl) return activity.imageUrl;
+  const collections = [activity.pairs || [], activity.questions || [], activity.items || [], activity.steps || [], activity.sentences || [], activity.wheelEntries || []];
+  for (let i = 0; i < collections.length; i++) {
+    const items = collections[i];
+    for (let j = 0; j < items.length; j++) {
+      const item = items[j] || {};
+      if (item.imageUrl) return item.imageUrl;
+      if (item.left && item.left.imageUrl) return item.left.imageUrl;
+      if (item.right && item.right.imageUrl) return item.right.imageUrl;
+      if (item.front && item.front.imageUrl) return item.front.imageUrl;
+      if (item.back && item.back.imageUrl) return item.back.imageUrl;
+    }
+  }
+  return '';
+}
+
+function setActivityDesign_(body) {
+  if (!authorized_(body.key)) throw new Error('La sesión docente venció. Inicia sesión otra vez.');
+  const id = String(body.id || '').slice(0, 100);
+  const sheet = spreadsheet_().getSheetByName(TAB_ACTIVITIES);
+  const row = findActivityRow_(sheet, id);
+  if (!row) throw new Error('No se encontró la actividad.');
+  const themes = ['mint', 'sky', 'lilac', 'peach'];
+  const theme = themes.indexOf(String(body.theme || 'mint')) >= 0 ? String(body.theme) : 'mint';
+  const activity = row.config;
+  let coverImageUrl = String(body.coverImageUrl || activity.coverImageUrl || activityPreviewImage_(activity) || '');
+  if (body.imageData) coverImageUrl = saveImage_(String(body.imageData), id + '-portada');
+  activity.coverImageUrl = coverImageUrl;
+  activity.cardTheme = theme;
+  sheet.getRange(row.row, 3).setValue(JSON.stringify(activity));
+  sheet.getRange(row.row, 5).setValue(new Date());
+  SpreadsheetApp.flush();
+  return { id: id, coverImageUrl: coverImageUrl, cardTheme: theme };
 }
 
 function getDeadlineMap_() {
@@ -653,8 +701,71 @@ function getOrCreateSheet_(ss, name, headers) {
 }
 
 function authorized_(pin) {
+  const value = String(pin || '');
+  const sessionKey = value ? 'TEACHER_SESSION_' + value : '';
+  const expiry = sessionKey ? Number(PropertiesService.getScriptProperties().getProperty(sessionKey) || 0) : 0;
+  if (expiry > Date.now()) return true;
+  if (expiry) PropertiesService.getScriptProperties().deleteProperty(sessionKey);
   const expected = PropertiesService.getScriptProperties().getProperty('TEACHER_PIN');
-  return Boolean(expected && String(pin || '') === expected);
+  return Boolean(expected && value === expected);
+}
+
+function ensureTeacherLogin_() {
+  const props = PropertiesService.getScriptProperties();
+  if (!props.getProperty('TEACHER_USERNAME')) props.setProperty('TEACHER_USERNAME', 'maestra');
+  if (props.getProperty('TEACHER_PASSWORD_HASH') && props.getProperty('TEACHER_PASSWORD_SALT')) return '';
+  const password = Utilities.getUuid().replace(/-/g, '').slice(0, 12);
+  const salt = Utilities.getUuid().replace(/-/g, '');
+  props.setProperty('TEACHER_PASSWORD_SALT', salt);
+  props.setProperty('TEACHER_PASSWORD_HASH', passwordHash_(salt, password));
+  return password;
+}
+
+function teacherLogin_(body) {
+  const requestId = String(body.requestId || ''), cache = CacheService.getScriptCache();
+  if (!/^[a-f0-9-]{30,40}$/i.test(requestId)) throw new Error('Solicitud de acceso inválida.');
+  const username = String(body.username || '').trim().toLowerCase();
+  const password = String(body.password || '');
+  const props = PropertiesService.getScriptProperties();
+  const expectedUser = String(props.getProperty('TEACHER_USERNAME') || '').toLowerCase();
+  const salt = props.getProperty('TEACHER_PASSWORD_SALT') || '';
+  const expectedHash = props.getProperty('TEACHER_PASSWORD_HASH') || '';
+  const throttleKey = 'teacher-lock:' + passwordHash_('teacher-login-throttle', username).slice(0, 32);
+  const failures = Number(cache.get(throttleKey) || 0);
+  if (failures >= 12) {
+    cache.put('teacher-login:' + requestId, JSON.stringify({ error: 'Demasiados intentos. Espera 15 minutos y vuelve a intentarlo.' }), 60);
+    return { accepted: true };
+  }
+  if (!expectedUser || !expectedHash || username !== expectedUser || passwordHash_(salt, password) !== expectedHash) {
+    cache.put(throttleKey, String(failures + 1), 900);
+    cache.put('teacher-login:' + requestId, JSON.stringify({ error: 'Usuario o contraseña incorrectos.' }), 60);
+    return { accepted: true };
+  }
+  cache.remove(throttleKey);
+  const token = Utilities.getUuid().replace(/-/g, '') + Utilities.getUuid().replace(/-/g, '').slice(0, 16);
+  const sessionExpiry = Date.now() + 30 * 24 * 60 * 60 * 1000;
+  const scriptProps = PropertiesService.getScriptProperties();
+  scriptProps.getKeys().forEach(function(key) {
+    if (key.indexOf('TEACHER_SESSION_') === 0 && Number(scriptProps.getProperty(key) || 0) <= Date.now()) scriptProps.deleteProperty(key);
+  });
+  scriptProps.setProperty('TEACHER_SESSION_' + token, String(sessionExpiry));
+  cache.put('teacher-login:' + requestId, JSON.stringify({ token: token, username: username }), 60);
+  return { accepted: true };
+}
+
+function teacherLoginResult_(requestId) {
+  if (!/^[a-f0-9-]{30,40}$/i.test(requestId)) return { error: 'Solicitud de acceso inválida.' };
+  const cache = CacheService.getScriptCache(), key = 'teacher-login:' + requestId;
+  const value = cache.get(key);
+  if (!value) return { pending: true };
+  cache.remove(key);
+  return JSON.parse(value);
+}
+
+function teacherLogout_(body) {
+  const token = String(body.token || '');
+  if (token) PropertiesService.getScriptProperties().deleteProperty('TEACHER_SESSION_' + token);
+  return { ok: true };
 }
 
 function clean_(value, max) {
