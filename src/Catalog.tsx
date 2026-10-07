@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { templateRegistry } from "./template-registry";
-import { apiRequest, forgetTeacherKey, getTeacherKey } from "./gas-client";
+import { apiRequest, getTeacherKey, getTeacherUsername, logoutTeacher } from "./gas-client";
 
 export default function Catalog() {
   const [search, setSearch] = useState("");
@@ -23,7 +23,7 @@ export default function Catalog() {
       .toLocaleLowerCase("es-MX").includes(search.trim().toLocaleLowerCase("es-MX"))), [search]);
 
   function signOut() {
-    forgetTeacherKey();
+    void logoutTeacher();
     setTeacher(false);
     setAccountOpen(false);
   }
@@ -34,9 +34,10 @@ export default function Catalog() {
       <nav className="catalog-nav" aria-label="Navegación principal">
         <a href="?panel=actividades">Mis actividades</a>
         <a href="?panel=resultados">Mis resultados</a>
+        <a href="?panel=alumno">Portal del alumno</a>
         <a className="catalog-create-link" href="?panel=actividades&seccion=crear">Crear actividad <span aria-hidden="true">＋</span></a>
         <div className="catalog-account">
-          <button type="button" aria-expanded={accountOpen} onClick={() => setAccountOpen(open => !open)}>{teacher ? "Docente" : "Cuenta"}<span aria-hidden="true">⌄</span></button>
+          <button type="button" aria-expanded={accountOpen} onClick={() => setAccountOpen(open => !open)}>{teacher ? getTeacherUsername() : "Cuenta"}<span aria-hidden="true">⌄</span></button>
           {accountOpen && <div className="catalog-account-menu">
             {teacher ? <><strong>Sesión docente</strong><button type="button" onClick={signOut}>Cerrar sesión</button></> : <a href="?panel=actividades">Acceso del maestro</a>}
           </div>}
@@ -66,4 +67,3 @@ export default function Catalog() {
     </div>
   </main>;
 }
-

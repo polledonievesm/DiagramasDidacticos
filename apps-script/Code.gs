@@ -1,6 +1,7 @@
 const TAB_ACTIVITIES = 'Actividades';
 const TAB_RESULTS = 'Resultados';
 const TAB_STUDENTS = 'Alumnos';
+const TAB_DEADLINES = 'Fechas límite';
 const STUDENT_HEADERS = ['ID', 'Apellido paterno', 'Apellido materno', 'Nombre(s)', 'Usuario', 'Sal', 'Hash de contraseña', 'Activo', 'Creada', 'Versión de contraseña'];
 const RESULT_HEADERS = ['ID', 'Actividad ID', 'Apellido paterno', 'Apellido materno', 'Nombre(s)', 'Aciertos', 'Total', 'Calificación', 'Tiempo realizado (s)', 'Tiempo restante (s)', 'Tiempo agotado', 'Respuestas JSON', 'Fecha', 'Alumno ID'];
 
@@ -12,7 +13,9 @@ function setupMigration() {
   const activitySheet = getOrCreateSheet_(sheetFile, TAB_ACTIVITIES, ['ID', 'Título', 'Configuración JSON', 'Imagen URL', 'Actualizada']);
   getOrCreateSheet_(sheetFile, TAB_RESULTS, RESULT_HEADERS);
   getOrCreateSheet_(sheetFile, TAB_STUDENTS, STUDENT_HEADERS);
+  ensureDeadlineSheet_(sheetFile);
   ensureTokenSecret_();
+  const firstTeacherPassword = ensureTeacherLogin_();
 
   let folderId = props.getProperty('DRIVE_FOLDER_ID');
   if (!folderId) {
@@ -33,7 +36,10 @@ function setupMigration() {
   }
 
   Logger.log('Panel de resultados: ' + sheetFile.getUrl());
-  Logger.log('Clave inicial del maestro (guárdala): ' + pin);
+  if (firstTeacherPassword) {
+    Logger.log('Acceso docente nuevo — usuario: maestra');
+    Logger.log('Contraseña temporal del maestro (guárdala; no volverá a mostrarse): ' + firstTeacherPassword);
+  }
   Logger.log('Carpeta de imágenes creada. ID: ' + folderId);
   Logger.log('Después, implementa el proyecto como Aplicación web y copia la URL /exec en config.js.');
 }
@@ -59,7 +65,13 @@ function doPost(e) {
     else if (body.action === 'archiveActivity') result = archiveActivity_(body);
     else if (body.action === 'saveStudents') result = saveStudents_(body);
     else if (body.action === 'studentLogin') result = studentLogin_(body);
+    else if (body.action === 'teacherLogin') result = teacherLogin_(body);
+    else if (body.action === 'teacherLogout') result = teacherLogout_(body);
     else if (body.action === 'resetStudentPassword') result = resetStudentPassword_(body);
+    else if (body.action === 'setStudentActive') result = setStudentActive_(body);
+    else if (body.action === 'deleteStudent') result = deleteStudent_(body);
+    else if (body.action === 'setActivityDeadline') result = setActivityDeadline_(body);
+    else if (body.action === 'setActivityDesign') result = setActivityDesign_(body);
     else result = { error: 'Operación no reconocida.' };
     return output_(result, 'json');
   } catch (err) {
@@ -72,13 +84,16 @@ function routeGet_(p) {
   if (action === 'activity') return getActivity_(String(p.id || 'digestivo-inicial'));
   if (action === 'pairActivities') return listPairActivities_();
   if (action === 'loginResult') return loginResult_(String(p.requestId || ''));
+  if (action === 'teacherLoginResult') return teacherLoginResult_(String(p.requestId || ''));
   if (action === 'attempts') return attemptInfo_(String(p.activityId || 'digestivo-inicial'), p.paternalSurname, p.maternalSurname, p.givenNames, p.studentToken);
   if (action === 'leaderboard') return leaderboard_(String(p.activityId || 'digestivo-inicial'));
+  if (action === 'studentPortal') return studentPortal_(String(p.studentToken || ''));
   if (action === 'capabilities') return { apiVersion: 4, kinds: ['diagram', 'pairs', 'quiz', 'quiz-show', 'true-false', 'group-sort', 'sequence', 'flashcards', 'memory', 'complete-sentence', 'complete-phrase', 'word-order', 'roulette', 'word-search'] };
   if (!authorized_(p.key)) return { error: 'Clave del maestro incorrecta.' };
   if (action === 'activities') return listActivities_();
   if (action === 'results') return listResults_();
   if (action === 'students') return listStudents_();
+  if (action === 'activityDeadline') return getDeadlineMap_()[String(p.id || '')] || { availableFrom: null, availableUntil: null };
   return { error: 'Operación no reconocida.' };
 }
 
@@ -121,6 +136,8 @@ function saveActivity_(body) {
     timeLimitSeconds: clamp_(body.timeLimitSeconds || 180, 15, 3600),
     maxAttempts: body.maxAttempts === null ? null : clamp_(body.maxAttempts || 3, 1, 35),
     imageUrl: imageUrl,
+    coverImageUrl: String(body.coverImageUrl || (old && old.config.coverImageUrl) || ''),
+    cardTheme: ['mint', 'sky', 'lilac', 'peach'].indexOf(String(body.cardTheme || (old && old.config.cardTheme) || 'mint')) >= 0 ? String(body.cardTheme || (old && old.config.cardTheme) || 'mint') : 'mint',
     labels: labels
   };
   const now = new Date();
@@ -243,7 +260,8 @@ function saveTemplateActivity_(body, id, title) {
     timerMode: mode, timeLimitSeconds: clamp_(body.timeLimitSeconds || 180, 15, 3600),
     maxAttempts: body.maxAttempts === null ? null : clamp_(body.maxAttempts || 3, 1, 35),
     shuffle: body.shuffle !== false, sound: body.sound !== false, scoring: true,
-    imageUrl: '', labels: []
+    imageUrl: '', coverImageUrl: String(body.coverImageUrl || (old && old.config.coverImageUrl) || ''),
+    cardTheme: ['mint', 'sky', 'lilac', 'peach'].indexOf(String(body.cardTheme || (old && old.config.cardTheme) || 'mint')) >= 0 ? String(body.cardTheme || (old && old.config.cardTheme) || 'mint') : 'mint', labels: []
   };
   Object.keys(content).forEach(function(key) { activity[key] = content[key]; });
   const row = [id, title, JSON.stringify(activity), '', new Date()];
@@ -274,7 +292,8 @@ function savePairActivity_(body, id, title) {
     id: id, kind: 'pairs', title: title, instructions: String(body.instructions || 'Arrastra cada elemento junto a su pareja. En celular, toca un elemento y después su pareja.').trim().slice(0, 240),
     timerMode: mode, timeLimitSeconds: clamp_(body.timeLimitSeconds || 180, 15, 3600),
     maxAttempts: body.maxAttempts === null ? null : clamp_(body.maxAttempts || 3, 1, 35),
-    imageUrl: '', labels: [], pairs: pairs
+    imageUrl: '', coverImageUrl: String(body.coverImageUrl || (old && old.config.coverImageUrl) || ''),
+    cardTheme: ['mint', 'sky', 'lilac', 'peach'].indexOf(String(body.cardTheme || (old && old.config.cardTheme) || 'mint')) >= 0 ? String(body.cardTheme || (old && old.config.cardTheme) || 'mint') : 'mint', labels: [], pairs: pairs
   };
   const sheet = spreadsheet_().getSheetByName(TAB_ACTIVITIES), now = new Date();
   const row = [id, title, JSON.stringify(activity), '', now];
@@ -294,6 +313,8 @@ function saveResult_(body) {
   const id = String(body.activityId || 'digestivo-inicial').slice(0, 100);
   const activity = getActivity_(id);
   if (activity.error) throw new Error('No se encontró la actividad.');
+  const unavailable = activityAvailabilityError_(activity);
+  if (unavailable) throw new Error(unavailable);
   const account = body.studentToken ? verifyStudentToken_(String(body.studentToken)) : null;
   if (body.studentToken && !account) throw new Error('Tu sesión venció. Vuelve a entrar con tu usuario y contraseña.');
   const paternal = account ? account.paternalSurname : clean_(body.paternalSurname, 70);
@@ -388,6 +409,8 @@ function attemptInfo_(activityId, paternalValue, maternalValue, namesValue, stud
   if (!paternal || !maternal || !names) return { error: 'Escribe los dos apellidos y tu nombre.' };
   const activity = getActivity_(activityId);
   if (activity.error) return { error: 'No se encontró la actividad.' };
+  const unavailable = activityAvailabilityError_(activity);
+  if (unavailable) return { error: unavailable };
   const sheet = spreadsheet_().getSheetByName(TAB_RESULTS);
   let used = 0;
   if (sheet.getLastRow() > 1) {
@@ -404,18 +427,117 @@ function attemptInfo_(activityId, paternalValue, maternalValue, namesValue, stud
 function leaderboard_(activityId) {
   const activity = getActivity_(activityId);
   if (activity.error) return { error: 'No se encontró la actividad.' };
-  const best = {};
+  const best = {}, counts = {};
   listResults_().filter(function(row) { return row.activity_id === activityId; }).forEach(function(row) {
-    const key = row.student_id || [normalizeStudent_(row.paternal_surname), normalizeStudent_(row.maternal_surname), normalizeStudent_(row.given_names)].join('|');
+    // Agrupa también los intentos antiguos que se guardaron antes de activar cuentas.
+    const key = [normalizeStudent_(row.paternal_surname), normalizeStudent_(row.maternal_surname), normalizeStudent_(row.given_names)].join('|');
+    counts[key] = (counts[key] || 0) + 1;
     const previous = best[key];
-    if (!previous || Number(row.correct) > Number(previous.correct) || (Number(row.correct) === Number(previous.correct) && Number(row.elapsed_seconds) < Number(previous.elapsed_seconds))) best[key] = row;
+    if (!previous || Number(row.grade) > Number(previous.grade) || (Number(row.grade) === Number(previous.grade) && Number(row.correct) > Number(previous.correct)) || (Number(row.grade) === Number(previous.grade) && Number(row.correct) === Number(previous.correct) && Number(row.elapsed_seconds) < Number(previous.elapsed_seconds))) best[key] = row;
   });
-  return Object.keys(best).map(function(key) { return best[key]; })
-    .sort(function(a, b) { return Number(b.correct) - Number(a.correct) || Number(a.elapsed_seconds) - Number(b.elapsed_seconds) || String(a.paternal_surname).localeCompare(String(b.paternal_surname), 'es-MX'); })
+  return Object.keys(best).map(function(key) { return { row: best[key], attempts: counts[key] }; })
+    .sort(function(a, b) { return Number(b.row.grade) - Number(a.row.grade) || Number(b.row.correct) - Number(a.row.correct) || Number(a.row.elapsed_seconds) - Number(b.row.elapsed_seconds) || String(a.row.paternal_surname).localeCompare(String(b.row.paternal_surname), 'es-MX'); })
     .slice(0, 35)
-    .map(function(row, index) {
-      return { rank: index + 1, name: String(row.given_names).trim().split(/\s+/)[0], paternalSurname: row.paternal_surname, correct: Number(row.correct), total: Number(row.total), grade: Number(row.grade), elapsedSeconds: Number(row.elapsed_seconds) };
+    .map(function(item, index) {
+      const row = item.row;
+      return { rank: index + 1, name: String(row.given_names).trim().split(/\s+/)[0], paternalSurname: row.paternal_surname, grade: Number(row.grade), attempts: Number(item.attempts) };
     });
+}
+
+function studentPortal_(token) {
+  const account = verifyStudentToken_(token);
+  if (!account || !account.active) return { error: 'La sesión del alumno venció. Inicia sesión de nuevo.' };
+  const attempts = listResults_().filter(function(row) {
+    return row.student_id === account.id || (!row.student_id && normalizeStudent_(row.paternal_surname) === normalizeStudent_(account.paternalSurname) && normalizeStudent_(row.maternal_surname) === normalizeStudent_(account.maternalSurname) && normalizeStudent_(row.given_names) === normalizeStudent_(account.givenNames));
+  });
+  const activities = listActivities_().map(function(activity) {
+    const startAt = activity.availableFrom || '';
+    const dueAt = activity.availableUntil || '';
+    const rows = attempts.filter(function(row) { return row.activity_id === activity.id; });
+    const best = rows.reduce(function(current, row) {
+      if (!current || Number(row.grade) > Number(current.grade) || (Number(row.grade) === Number(current.grade) && Number(row.correct) > Number(current.correct))) return row;
+      return current;
+    }, null);
+    const expired = Boolean(dueAt && new Date(dueAt).getTime() <= Date.now());
+    const scheduled = Boolean(startAt && new Date(startAt).getTime() > Date.now());
+    return { id: activity.id, title: activity.title, instructions: activity.instructions || '', kind: activity.kind || 'diagram', imageUrl: activity.coverImageUrl || activityPreviewImage_(activity), theme: activity.cardTheme || 'mint', availableFrom: startAt || null, dueAt: dueAt || null,
+      scheduled: scheduled, expired: expired, attempts: rows.length, bestGrade: best ? Number(best.grade) : null, completed: rows.length > 0 };
+  });
+  const grades = activities.filter(function(item) { return item.bestGrade !== null; }).map(function(item) { return Number(item.bestGrade); });
+  const average = grades.length ? Math.round(grades.reduce(function(sum, grade) { return sum + grade; }, 0) / grades.length * 10) / 10 : null;
+  return { student: { id: account.id, name: account.givenNames, givenNames: account.givenNames, paternalSurname: account.paternalSurname, maternalSurname: account.maternalSurname, username: account.username }, activities: activities, average: average, completedCount: grades.length };
+}
+
+function activityPreviewImage_(activity) {
+  if (activity.imageUrl) return activity.imageUrl;
+  const collections = [activity.pairs || [], activity.questions || [], activity.items || [], activity.steps || [], activity.sentences || [], activity.wheelEntries || []];
+  for (let i = 0; i < collections.length; i++) {
+    const items = collections[i];
+    for (let j = 0; j < items.length; j++) {
+      const item = items[j] || {};
+      if (item.imageUrl) return item.imageUrl;
+      if (item.left && item.left.imageUrl) return item.left.imageUrl;
+      if (item.right && item.right.imageUrl) return item.right.imageUrl;
+      if (item.front && item.front.imageUrl) return item.front.imageUrl;
+      if (item.back && item.back.imageUrl) return item.back.imageUrl;
+    }
+  }
+  return '';
+}
+
+function setActivityDesign_(body) {
+  if (!authorized_(body.key)) throw new Error('La sesión docente venció. Inicia sesión otra vez.');
+  const id = String(body.id || '').slice(0, 100);
+  const sheet = spreadsheet_().getSheetByName(TAB_ACTIVITIES);
+  const row = findActivityRow_(sheet, id);
+  if (!row) throw new Error('No se encontró la actividad.');
+  const themes = ['mint', 'sky', 'lilac', 'peach'];
+  const theme = themes.indexOf(String(body.theme || 'mint')) >= 0 ? String(body.theme) : 'mint';
+  const activity = row.config;
+  let coverImageUrl = String(body.coverImageUrl || activity.coverImageUrl || activityPreviewImage_(activity) || '');
+  if (body.imageData) coverImageUrl = saveImage_(String(body.imageData), id + '-portada');
+  activity.coverImageUrl = coverImageUrl;
+  activity.cardTheme = theme;
+  sheet.getRange(row.row, 3).setValue(JSON.stringify(activity));
+  sheet.getRange(row.row, 5).setValue(new Date());
+  SpreadsheetApp.flush();
+  return { id: id, coverImageUrl: coverImageUrl, cardTheme: theme };
+}
+
+function getDeadlineMap_() {
+  const sheet = spreadsheet_().getSheetByName(TAB_DEADLINES), map = {};
+  if (!sheet || sheet.getLastRow() < 2) return map;
+  sheet.getRange(2, 1, sheet.getLastRow() - 1, 3).getValues().forEach(function(row) {
+    if (!row[0]) return;
+    map[String(row[0])] = { availableFrom: row[1] ? new Date(row[1]).toISOString() : null, availableUntil: row[2] ? new Date(row[2]).toISOString() : null };
+  });
+  return map;
+}
+
+function setActivityDeadline_(body) {
+  if (!authorized_(body.key)) throw new Error('Clave del maestro incorrecta.');
+  const id = String(body.id || '').slice(0, 100);
+  if (!findActivityRow_(spreadsheet_().getSheetByName(TAB_ACTIVITIES), id)) throw new Error('No se encontró la actividad.');
+  const rawFrom = String(body.availableFrom || '').trim(), rawUntil = String(body.availableUntil || '').trim(), sheet = spreadsheet_().getSheetByName(TAB_DEADLINES);
+  const rows = sheet.getLastRow() < 2 ? [] : sheet.getRange(2, 1, sheet.getLastRow() - 1, 4).getValues();
+  const index = rows.findIndex(function(row) { return String(row[0]) === id; });
+  if (!rawFrom && !rawUntil) {
+    if (index >= 0) sheet.deleteRow(index + 2);
+    return { ok: true, availableFrom: null, availableUntil: null };
+  }
+  const from = rawFrom ? new Date(rawFrom) : null, until = rawUntil ? new Date(rawUntil) : null;
+  if ((from && !isFinite(from.getTime())) || (until && !isFinite(until.getTime()))) throw new Error('La fecha y hora no son válidas.');
+  if (from && until && from.getTime() >= until.getTime()) throw new Error('La fecha de finalización debe ser posterior a la fecha de activación.');
+  const fromValue = from ? from.toISOString() : '', untilValue = until ? until.toISOString() : '';
+  if (index >= 0) sheet.getRange(index + 2, 1, 1, 4).setValues([[id, fromValue, untilValue, new Date()]]);
+  else sheet.appendRow([id, fromValue, untilValue, new Date()]);
+  return { ok: true, availableFrom: fromValue || null, availableUntil: untilValue || null };
+}
+
+function activityAvailabilityError_(activity) {
+  if (activity.availableFrom && new Date(activity.availableFrom).getTime() > Date.now()) return 'La actividad aún no está disponible.';
+  if (activity.availableUntil && new Date(activity.availableUntil).getTime() <= Date.now()) return 'El plazo para esta actividad terminó.';
+  return '';
 }
 
 function normalizeWord_(value) { return String(value || '').toLocaleUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-ZÑ]/g, ''); }
@@ -456,6 +578,9 @@ function getActivity_(id) {
   try {
     const activity = row.config;
     if (activity.archivedAt) return { error: 'La actividad fue archivada.' };
+    const availability = getDeadlineMap_()[id] || {};
+    activity.availableFrom = availability.availableFrom || null;
+    activity.availableUntil = availability.availableUntil || null;
     if (activity.maxAttempts === undefined) activity.maxAttempts = 3;
     if (activity.kind === 'pairs') activity.instructions = activity.instructions || 'Arrastra cada elemento junto a su pareja. En celular, toca un elemento y después su pareja.';
     else if (activity.kind === 'diagram' || !activity.kind) activity.instructions = 'Arrastra y suelta las chinchetas en su lugar correcto de la imagen.';
@@ -468,10 +593,14 @@ function getActivity_(id) {
 function listActivities_() {
   const sheet = spreadsheet_().getSheetByName(TAB_ACTIVITIES);
   if (sheet.getLastRow() < 2) return [];
+  const deadlineMap = getDeadlineMap_();
   return sheet.getRange(2, 1, sheet.getLastRow() - 1, 3).getValues().map(function(row) {
     try {
       const activity = JSON.parse(row[2]);
       if (activity.archivedAt) return null;
+      const availability = deadlineMap[String(row[0])] || {};
+      activity.availableFrom = availability.availableFrom || null;
+      activity.availableUntil = availability.availableUntil || null;
       if (activity.maxAttempts === undefined) activity.maxAttempts = 3;
       if (activity.kind === 'pairs') activity.instructions = activity.instructions || 'Une cada elemento con su pareja.';
       else if (activity.kind === 'diagram' || !activity.kind) activity.instructions = 'Arrastra y suelta las chinchetas en su lugar correcto de la imagen.';
@@ -536,8 +665,24 @@ function spreadsheet_() {
   getOrCreateSheet_(ss, TAB_ACTIVITIES, ['ID', 'Título', 'Configuración JSON', 'Imagen URL', 'Actualizada']);
   getOrCreateSheet_(ss, TAB_RESULTS, RESULT_HEADERS);
   getOrCreateSheet_(ss, TAB_STUDENTS, STUDENT_HEADERS);
+  ensureDeadlineSheet_(ss);
   ensureTokenSecret_();
   return ss;
+}
+
+function ensureDeadlineSheet_(ss) {
+  let sheet = ss.getSheetByName(TAB_DEADLINES);
+  if (!sheet) sheet = ss.insertSheet(TAB_DEADLINES);
+  if (sheet.getLastRow() === 0) {
+    sheet.appendRow(['Actividad ID', 'Disponible desde', 'Disponible hasta', 'Actualizada']);
+  } else if (String(sheet.getRange(1, 2).getValue()) === 'Disponible hasta') {
+    sheet.insertColumnBefore(2);
+    sheet.getRange(1, 1, 1, 4).setValues([['Actividad ID', 'Disponible desde', 'Disponible hasta', 'Actualizada']]);
+  } else {
+    sheet.getRange(1, 1, 1, 4).setValues([['Actividad ID', 'Disponible desde', 'Disponible hasta', 'Actualizada']]);
+  }
+  sheet.setFrozenRows(1);
+  return sheet;
 }
 
 function getOrCreateSheet_(ss, name, headers) {
@@ -556,8 +701,71 @@ function getOrCreateSheet_(ss, name, headers) {
 }
 
 function authorized_(pin) {
+  const value = String(pin || '');
+  const sessionKey = value ? 'TEACHER_SESSION_' + value : '';
+  const expiry = sessionKey ? Number(PropertiesService.getScriptProperties().getProperty(sessionKey) || 0) : 0;
+  if (expiry > Date.now()) return true;
+  if (expiry) PropertiesService.getScriptProperties().deleteProperty(sessionKey);
   const expected = PropertiesService.getScriptProperties().getProperty('TEACHER_PIN');
-  return Boolean(expected && String(pin || '') === expected);
+  return Boolean(expected && value === expected);
+}
+
+function ensureTeacherLogin_() {
+  const props = PropertiesService.getScriptProperties();
+  if (!props.getProperty('TEACHER_USERNAME')) props.setProperty('TEACHER_USERNAME', 'maestra');
+  if (props.getProperty('TEACHER_PASSWORD_HASH') && props.getProperty('TEACHER_PASSWORD_SALT')) return '';
+  const password = Utilities.getUuid().replace(/-/g, '').slice(0, 12);
+  const salt = Utilities.getUuid().replace(/-/g, '');
+  props.setProperty('TEACHER_PASSWORD_SALT', salt);
+  props.setProperty('TEACHER_PASSWORD_HASH', passwordHash_(salt, password));
+  return password;
+}
+
+function teacherLogin_(body) {
+  const requestId = String(body.requestId || ''), cache = CacheService.getScriptCache();
+  if (!/^[a-f0-9-]{30,40}$/i.test(requestId)) throw new Error('Solicitud de acceso inválida.');
+  const username = String(body.username || '').trim().toLowerCase();
+  const password = String(body.password || '');
+  const props = PropertiesService.getScriptProperties();
+  const expectedUser = String(props.getProperty('TEACHER_USERNAME') || '').toLowerCase();
+  const salt = props.getProperty('TEACHER_PASSWORD_SALT') || '';
+  const expectedHash = props.getProperty('TEACHER_PASSWORD_HASH') || '';
+  const throttleKey = 'teacher-lock:' + passwordHash_('teacher-login-throttle', username).slice(0, 32);
+  const failures = Number(cache.get(throttleKey) || 0);
+  if (failures >= 12) {
+    cache.put('teacher-login:' + requestId, JSON.stringify({ error: 'Demasiados intentos. Espera 15 minutos y vuelve a intentarlo.' }), 60);
+    return { accepted: true };
+  }
+  if (!expectedUser || !expectedHash || username !== expectedUser || passwordHash_(salt, password) !== expectedHash) {
+    cache.put(throttleKey, String(failures + 1), 900);
+    cache.put('teacher-login:' + requestId, JSON.stringify({ error: 'Usuario o contraseña incorrectos.' }), 60);
+    return { accepted: true };
+  }
+  cache.remove(throttleKey);
+  const token = Utilities.getUuid().replace(/-/g, '') + Utilities.getUuid().replace(/-/g, '').slice(0, 16);
+  const sessionExpiry = Date.now() + 30 * 24 * 60 * 60 * 1000;
+  const scriptProps = PropertiesService.getScriptProperties();
+  scriptProps.getKeys().forEach(function(key) {
+    if (key.indexOf('TEACHER_SESSION_') === 0 && Number(scriptProps.getProperty(key) || 0) <= Date.now()) scriptProps.deleteProperty(key);
+  });
+  scriptProps.setProperty('TEACHER_SESSION_' + token, String(sessionExpiry));
+  cache.put('teacher-login:' + requestId, JSON.stringify({ token: token, username: username }), 60);
+  return { accepted: true };
+}
+
+function teacherLoginResult_(requestId) {
+  if (!/^[a-f0-9-]{30,40}$/i.test(requestId)) return { error: 'Solicitud de acceso inválida.' };
+  const cache = CacheService.getScriptCache(), key = 'teacher-login:' + requestId;
+  const value = cache.get(key);
+  if (!value) return { pending: true };
+  cache.remove(key);
+  return JSON.parse(value);
+}
+
+function teacherLogout_(body) {
+  const token = String(body.token || '');
+  if (token) PropertiesService.getScriptProperties().deleteProperty('TEACHER_SESSION_' + token);
+  return { ok: true };
 }
 
 function clean_(value, max) {
@@ -658,6 +866,40 @@ function resetStudentPassword_(body) {
   sheet.getRange(row, 10).setValue(Utilities.getUuid());
   SpreadsheetApp.flush();
   return { reset: true };
+}
+
+function setStudentActive_(body) {
+  if (!authorized_(body.key)) throw new Error('Clave del maestro incorrecta.');
+  const id = String(body.studentId || '');
+  const rows = getStudentRows_();
+  const index = rows.findIndex(function(s) { return s.id === id; });
+  if (index < 0) throw new Error('No se encontró la cuenta del alumno.');
+  const sheet = spreadsheet_().getSheetByName(TAB_STUDENTS), row = index + 2;
+  const active = body.active === true;
+  sheet.getRange(row, 8).setValue(active);
+  sheet.getRange(row, 10).setValue(Utilities.getUuid());
+  SpreadsheetApp.flush();
+  return { ok: true, active: active };
+}
+
+function deleteStudent_(body) {
+  if (!authorized_(body.key)) throw new Error('Clave del maestro incorrecta.');
+  const id = String(body.studentId || ''), students = getStudentRows_();
+  const index = students.findIndex(function(student) { return student.id === id; });
+  if (index < 0) throw new Error('No se encontró la cuenta del alumno.');
+  const student = students[index], resultSheet = spreadsheet_().getSheetByName(TAB_RESULTS);
+  if (resultSheet.getLastRow() > 1) {
+    const rows = resultSheet.getRange(2, 1, resultSheet.getLastRow() - 1, RESULT_HEADERS.length).getValues();
+    for (let i = rows.length - 1; i >= 0; i--) {
+      const row = rows[i];
+      const sameId = String(row[13] || '') === id;
+      const legacyMatch = !row[13] && normalizeStudent_(row[2]) === normalizeStudent_(student.paternalSurname) && normalizeStudent_(row[3]) === normalizeStudent_(student.maternalSurname) && normalizeStudent_(row[4]) === normalizeStudent_(student.givenNames);
+      if (sameId || legacyMatch) resultSheet.deleteRow(i + 2);
+    }
+  }
+  spreadsheet_().getSheetByName(TAB_STUDENTS).deleteRow(index + 2);
+  SpreadsheetApp.flush();
+  return { ok: true, deleted: true };
 }
 
 function passwordHash_(salt, password) {

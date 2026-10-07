@@ -48,3 +48,37 @@
 .am-report-select select{width:100%;min-height:44px;padding:10px 12px;border:1px solid #d8e1dd;border-radius:11px;background:#fff;color:#263931;font:inherit}
 .am-report-done,.am-report-pending{display:inline-flex;border-radius:999px;padding:5px 9px;font-size:11px;font-weight:800;white-space:nowrap}
 .am-report-done{background:#e8f5ed;color:#28734f}.am-report-pending{background:#f1f3f2;color:#6c7772}
+.am-deadline{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:end;padding:12px;margin:14px 0;background:#f5f8f7;border:1px solid #e0e8e4;border-radius:12px}.am-deadline label{display:grid;gap:5px;color:#566a62;font-size:12px;font-weight:750}.am-deadline input{min-width:0;width:100%;min-height:38px;padding:7px;border:1px solid #d5e0db;border-radius:8px;font:inherit;color:#263931}.am-deadline button{min-height:38px;border:0;border-radius:8px;background:#e1eee7;color:#235d41;font-weight:750;padding:8px 10px;cursor:pointer}.am-deadline small{grid-column:1/-1;color:#72827b;font-size:11px}@media(max-width:520px){.am-deadline{grid-template-columns:1fr}.am-deadline small{grid-column:auto}}
+
+/* Activity cover and light color options shared with the student portal. */
+.activity-manager-page{background:radial-gradient(ellipse at 8% 2%,#eaf4e9 0,transparent 36%),#f7f8f4;color:#263b36}
+.am-refresh{background:#5e9b78;border-color:#5e9b78}
+.am-card-image{display:grid;place-items:center;aspect-ratio:16/9;max-height:185px;margin:-18px -18px 14px;overflow:hidden;border-radius:17px 17px 0 0;background:#edf5ec}
+.am-card-image img{width:100%;height:100%;object-fit:contain}
+.am-image-placeholder{color:#678273;font-size:13px;font-weight:800;letter-spacing:.08em}
+.am-activity-card.theme-sky .am-card-image{background:#edf5f8}
+.am-activity-card.theme-lilac .am-card-image{background:#f2eff8}
+.am-activity-card.theme-peach .am-card-image{background:#fbf0e8}
+.am-design-controls{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(130px,.7fr) auto;align-items:end;gap:8px;padding:12px;margin:14px 0;background:#fbfcf8;border:1px solid #e3ebe2;border-radius:13px}
+.am-design-controls label{display:grid;gap:5px;min-width:0;color:#52685a;font-size:11px;font-weight:800}
+.am-design-controls input[type=file],.am-design-controls select{width:100%;min-width:0;min-height:37px;padding:6px;border:1px solid #d9e3da;border-radius:8px;background:#fff;color:#405548;font:inherit;font-size:11px}
+.am-design-controls label small{font-size:10px;font-weight:500;color:#7e8b81}
+.am-design-controls>button{min-height:37px;padding:8px 11px;border:0;border-radius:9px;background:#6ca785;color:white;font-size:11px;font-weight:800;cursor:pointer;white-space:nowrap}
+.am-design-controls>button:disabled{opacity:.55}
+.credential-selection{margin:16px 0;padding:16px;background:#f7fbf7;border:1px solid #dfeae0;border-radius:15px}
+.credential-selection-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.credential-selection-head>div:first-child{display:grid;gap:4px}
+.credential-selection-head strong{color:#355344}
+.credential-selection-head span{font-size:12px;color:#758279}
+.credential-selection-head>div:last-child{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.credential-check-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:7px;margin-top:13px}
+.credential-check-list label{display:grid;grid-template-columns:18px 1fr;align-items:center;gap:2px 8px;padding:9px 10px;border:1px solid #e2eae2;border-radius:10px;background:#fff;color:#43584a;font-size:12px}
+.credential-check-list input{grid-row:span 2;accent-color:#5e9b78}
+.credential-check-list small{color:#839087;font-size:10px}
+.access-card label{display:grid;gap:7px;margin:12px 0;color:#42594a;font-weight:700}
+.access-card input{width:100%;box-sizing:border-box;padding:13px 14px;border:1px solid #d9e3da;border-radius:11px;font:inherit}
+.access-card{width:min(430px,calc(100% - 34px));margin:9vh auto;padding:30px;background:#fff;border:1px solid #e0e9df;border-radius:22px;box-shadow:0 17px 48px #2d4a3510}
+.access-card h1{margin:8px 0;font-size:30px;letter-spacing:-.035em}
+.access-card>p{color:#728078;line-height:1.5}
+.access-card>.primary{width:100%;margin-top:7px;background:#5e9b78}
+@media(max-width:700px){.am-design-controls{grid-template-columns:1fr 1fr}.am-design-controls>label:first-child{grid-column:1/-1}.am-design-controls>button{grid-column:1/-1}.credential-selection-head{align-items:flex-start}.credential-check-list{grid-template-columns:1fr}.am-card-image{max-height:210px}}
