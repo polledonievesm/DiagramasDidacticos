@@ -3,7 +3,7 @@ import { apiRequest, clearStudentSession, getStudentSession, saveStudentSession 
 import type { ActivityKind } from "./default-activity";
 import "./student-portal.css";
 
-type PortalActivity = { id:string; title:string; kind:ActivityKind; availableFrom:string|null; dueAt:string|null; scheduled:boolean; expired:boolean; attempts:number; bestGrade:number|null; completed:boolean };
+type PortalActivity = { id:string; title:string; instructions?:string; kind:ActivityKind; imageUrl?:string; theme?:"mint"|"sky"|"lilac"|"peach"; availableFrom:string|null; dueAt:string|null; scheduled:boolean; expired:boolean; attempts:number; bestGrade:number|null; completed:boolean };
 type PortalData = { student:{id:string;name:string;givenNames:string;paternalSurname:string;maternalSurname:string;username:string}; activities:PortalActivity[]; average:number|null; completedCount:number };
 
 function activityLink(activity:PortalActivity) {
@@ -71,10 +71,12 @@ export default function StudentPortal() {
         <section className="sp-section">
           <h2>Actividades disponibles <span>{open.length}</span></h2>
           {open.length ? <div className="sp-grid">{open.map(item => (
-            <article className="sp-card" key={item.id}>
+            <article className={`sp-card theme-${item.theme||"mint"}`} key={item.id}>
+              <div className="sp-cover">{item.imageUrl?<img src={item.imageUrl} alt={`Imagen de ${item.title}`} loading="lazy"/>:<span aria-hidden="true">✦</span>}</div>
               <div className="sp-card-status">{item.completed ? "Realizada" : "Pendiente"}</div>
               <h3>{item.title}</h3>
-              <p>{item.completed ? `Tu mejor calificación: ${Number(item.bestGrade).toFixed(1)} / 10 · ${item.attempts} ${item.attempts===1 ? "intento" : "intentos"}` : "Aún no la has realizado."}</p>
+              <p>{item.instructions || (item.completed ? `Tu mejor calificación: ${Number(item.bestGrade).toFixed(1)} / 10 · ${item.attempts} ${item.attempts===1 ? "intento" : "intentos"}` : "Aún no la has realizado.")}</p>
+              {item.completed&&<p className="sp-grade-note">Tu mejor calificación: {Number(item.bestGrade).toFixed(1)} / 10 · {item.attempts} {item.attempts===1?"intento":"intentos"}</p>}
               <small>{item.dueAt ? `Finaliza ${new Date(item.dueAt).toLocaleString("es-MX")}` : "Sin fecha de cierre"}</small>
               <a href={activityLink(item)}>{item.completed ? "Volver a practicar" : "Comenzar actividad"} →</a>
             </article>
@@ -82,12 +84,13 @@ export default function StudentPortal() {
         </section>
         {scheduled.length > 0 && <section className="sp-section">
           <h2>Actividades programadas <span>{scheduled.length}</span></h2>
-          <div className="sp-grid">{scheduled.map(item => <article className="sp-card" key={item.id}><div className="sp-card-status sp-scheduled-status">Próximamente</div><h3>{item.title}</h3><p>Esta actividad todavía no está disponible.</p><small>Se activa {item.availableFrom ? new Date(item.availableFrom).toLocaleString("es-MX") : "pronto"}</small></article>)}</div>
+          <div className="sp-grid">{scheduled.map(item => <article className={`sp-card theme-${item.theme||"mint"}`} key={item.id}><div className="sp-cover">{item.imageUrl?<img src={item.imageUrl} alt={`Imagen de ${item.title}`} loading="lazy"/>:<span aria-hidden="true">✦</span>}</div><div className="sp-card-status sp-scheduled-status">Próximamente</div><h3>{item.title}</h3><p>{item.instructions||"Esta actividad todavía no está disponible."}</p><small>Se activa {item.availableFrom ? new Date(item.availableFrom).toLocaleString("es-MX") : "pronto"}</small></article>)}</div>
         </section>}
         {expired.length > 0 && <section className="sp-section sp-expired">
           <h2>Plazo terminado <span>{expired.length}</span></h2>
           <div className="sp-grid">{expired.map(item => (
-            <article className="sp-card" key={item.id}>
+            <article className={`sp-card theme-${item.theme||"mint"}`} key={item.id}>
+              <div className="sp-cover">{item.imageUrl?<img src={item.imageUrl} alt={`Imagen de ${item.title}`} loading="lazy"/>:<span aria-hidden="true">✦</span>}</div>
               <div className="sp-card-status">{item.completed ? "Cerrada · realizada" : "Cerrada · pendiente"}</div>
               <h3>{item.title}</h3>
               <p>{item.completed ? `Mejor calificación: ${Number(item.bestGrade).toFixed(1)} / 10 · ${item.attempts} intentos` : "No se registró una entrega antes del cierre."}</p>
