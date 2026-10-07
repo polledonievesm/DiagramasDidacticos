@@ -3,7 +3,7 @@ import { apiRequest, clearStudentSession, getStudentSession, saveStudentSession 
 import type { ActivityKind } from "./default-activity";
 import "./student-portal.css";
 
-type PortalActivity = { id:string; title:string; kind:ActivityKind; dueAt:string|null; expired:boolean; attempts:number; bestGrade:number|null; completed:boolean };
+type PortalActivity = { id:string; title:string; kind:ActivityKind; availableFrom:string|null; dueAt:string|null; scheduled:boolean; expired:boolean; attempts:number; bestGrade:number|null; completed:boolean };
 type PortalData = { student:{id:string;name:string;givenNames:string;paternalSurname:string;maternalSurname:string;username:string}; activities:PortalActivity[]; average:number|null; completedCount:number };
 
 function activityLink(activity:PortalActivity) {
@@ -59,7 +59,7 @@ export default function StudentPortal() {
     </main>
   );
 
-  const open=portal.activities.filter(item=>!item.expired),expired=portal.activities.filter(item=>item.expired);
+  const open=portal.activities.filter(item=>!item.expired&&!item.scheduled),scheduled=portal.activities.filter(item=>item.scheduled&&!item.expired),expired=portal.activities.filter(item=>item.expired);
   return (
     <main className="student-portal">
       <header className="sp-header"><a href="./">Aula en juego</a><span>Espacio del alumno</span><button onClick={signOut}>Cerrar sesión</button></header>
@@ -75,11 +75,15 @@ export default function StudentPortal() {
               <div className="sp-card-status">{item.completed ? "Realizada" : "Pendiente"}</div>
               <h3>{item.title}</h3>
               <p>{item.completed ? `Tu mejor calificación: ${Number(item.bestGrade).toFixed(1)} / 10 · ${item.attempts} ${item.attempts===1 ? "intento" : "intentos"}` : "Aún no la has realizado."}</p>
-              <small>{item.dueAt ? `Disponible hasta ${new Date(item.dueAt).toLocaleString("es-MX")}` : "Sin fecha de cierre"}</small>
+              <small>{item.dueAt ? `Finaliza ${new Date(item.dueAt).toLocaleString("es-MX")}` : "Sin fecha de cierre"}</small>
               <a href={activityLink(item)}>{item.completed ? "Volver a practicar" : "Comenzar actividad"} →</a>
             </article>
           ))}</div> : <p className="sp-empty">No tienes actividades disponibles por ahora.</p>}
         </section>
+        {scheduled.length > 0 && <section className="sp-section">
+          <h2>Actividades programadas <span>{scheduled.length}</span></h2>
+          <div className="sp-grid">{scheduled.map(item => <article className="sp-card" key={item.id}><div className="sp-card-status sp-scheduled-status">Próximamente</div><h3>{item.title}</h3><p>Esta actividad todavía no está disponible.</p><small>Se activa {item.availableFrom ? new Date(item.availableFrom).toLocaleString("es-MX") : "pronto"}</small></article>)}</div>
+        </section>}
         {expired.length > 0 && <section className="sp-section sp-expired">
           <h2>Plazo terminado <span>{expired.length}</span></h2>
           <div className="sp-grid">{expired.map(item => (
