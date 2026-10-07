@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 5303)
-Total output lines: 334
-
 import type { Activity } from "./default-activity";
 
 type ApiResult = Record<string, unknown>;
@@ -169,7 +166,81 @@ export async function apiRequest(path: string, init: RequestInit = {}) {
   if (method === "POST" && url.pathname.endsWith("/api/student/login")) {
     const requestId = crypto.randomUUID();
     await send({ action: "studentLogin", requestId, username: String(body.username || ""), password: String(body.password || "") });
- …1303 tokens truncated…" }, 503);
+    for (let i = 0; i < 12; i++) {
+      const data = await jsonp<ApiResult>({ action: "loginResult", requestId });
+      if (!data.pending) return response(data, "error" in data ? 401 : 200);
+      await new Promise((resolve) => window.setTimeout(resolve, 250));
+    }
+    return response({ error: "El acceso tardó demasiado. Vuelve a intentarlo." }, 503);
+  }
+  if (method === "POST" && url.pathname.endsWith("/api/teacher/login")) {
+    const requestId = crypto.randomUUID();
+    await send({ action: "teacherLogin", requestId, username: String(body.username || ""), password: String(body.password || "") });
+    for (let i = 0; i < 12; i++) {
+      const data = await jsonp<ApiResult>({ action: "teacherLoginResult", requestId });
+      if (!data.pending) return response(data, "error" in data ? 401 : 200);
+      await new Promise((resolve) => window.setTimeout(resolve, 250));
+    }
+    return response({ error: "El acceso tardó demasiado. Vuelve a intentarlo." }, 503);
+  }
+  if (method === "POST" && url.pathname.endsWith("/api/teacher/logout")) {
+    const token = String(body.token || "");
+    if (token) await send({ action: "teacherLogout", token });
+    forgetTeacherKey();
+    return response({ ok: true });
+  }
+  if (method === "POST" && url.pathname.endsWith("/api/teacher/students")) {
+    const key = new Headers(init.headers).get("x-teacher-key") || "";
+    await send({ ...body, action: "saveStudents", key });
+    const data = await jsonp<ApiResult[] | ApiResult>({ action: "students", key });
+    if (!Array.isArray(data)) return response(data as ApiResult, 401);
+    const expected = ((body.students || []) as Array<{ id: string }>).map((s) => s.id);
+    const saved = new Set(data.map((s) => String(s.id)));
+    if (expected.some((id) => !saved.has(id))) return response({ error: "No se pudieron verificar todas las cuentas. Revisa la lista e inténtalo de nuevo." }, 503);
+    return response({ students: data });
+  }
+  if (method === "POST" && url.pathname.endsWith("/api/teacher/student-password")) {
+    const key = new Headers(init.headers).get("x-teacher-key") || "";
+    const before = await jsonp<ApiResult[] | ApiResult>({ action: "students", key });
+    if (!Array.isArray(before)) return response(before as ApiResult, 401);
+    const studentId = String(body.studentId || "");
+    const previous = before.find((s) => String(s.id) === studentId);
+    if (!previous) return response({ error: "No se encontró la cuenta del alumno." }, 404);
+    await send({ ...body, action: "resetStudentPassword", key });
+    const data = await jsonp<ApiResult[] | ApiResult>({ action: "students", key });
+    if (!Array.isArray(data)) return response(data as ApiResult, 401);
+    const updated = data.find((s) => String(s.id) === studentId);
+    if (!updated || updated.password_version === previous.password_version) return response({ error: "No se pudo verificar el cambio de contraseña. Comprueba la clave del maestro e inténtalo otra vez." }, 503);
+    return response({ students: data });
+  }
+  if (method === "POST" && url.pathname.endsWith("/api/teacher/student-active")) {
+    const key = new Headers(init.headers).get("x-teacher-key") || "";
+    await send({ ...body, action: "setStudentActive", key });
+    const data = await jsonp<ApiResult[]>({ action: "students", key });
+    if (!Array.isArray(data)) return response(data as ApiResult, 401);
+    const updated = data.find(student => String(student.id) === String(body.studentId || ""));
+    if (!updated || Boolean(updated.active) !== (body.active === true)) return response({ error: "No se pudo verificar el cambio de estado de la cuenta." }, 503);
+    return response({ students: data });
+  }
+  if (method === "POST" && url.pathname.endsWith("/api/teacher/student-delete")) {
+    const key = new Headers(init.headers).get("x-teacher-key") || "";
+    await send({ ...body, action: "deleteStudent", key });
+    const data = await jsonp<ApiResult[]>({ action: "students", key });
+    if (!Array.isArray(data)) return response(data as ApiResult, 401);
+    const deletedId = String(body.studentId || "");
+    if (data.some(student => String(student.id) === deletedId)) return response({ error: "No se pudo verificar la eliminación de la cuenta." }, 503);
+    return response({ students: data });
+  }
+  if (method === "POST" && url.pathname.endsWith("/api/teacher/activity-deadline")) {
+    const key = new Headers(init.headers).get("x-teacher-key") || "";
+    await send({ ...body, action: "setActivityDeadline", key });
+    const data = await jsonp<ApiResult>({ action: "activityDeadline", id: String(body.id || ""), key });
+    if ("error" in data) return response(data, 401);
+    const wantedFrom = body.availableFrom ? new Date(String(body.availableFrom)).getTime() : null;
+    const savedFrom = data.availableFrom ? new Date(String(data.availableFrom)).getTime() : null;
+    const wantedUntil = body.availableUntil ? new Date(String(body.availableUntil)).getTime() : null;
+    const savedUntil = data.availableUntil ? new Date(String(data.availableUntil)).getTime() : null;
+    if (wantedFrom !== savedFrom || wantedUntil !== savedUntil) return response({ error: "No se pudo verificar el periodo de disponibilidad guardado." }, 503);
     return response(data);
   }
   if (method === "POST" && url.pathname.endsWith("/api/teacher/activity-design")) {
