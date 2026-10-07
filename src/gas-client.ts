@@ -188,14 +188,25 @@ export async function apiRequest(path: string, init: RequestInit = {}) {
     if (!updated || Boolean(updated.active) !== (body.active === true)) return response({ error: "No se pudo verificar el cambio de estado de la cuenta." }, 503);
     return response({ students: data });
   }
+  if (method === "POST" && url.pathname.endsWith("/api/teacher/student-delete")) {
+    const key = new Headers(init.headers).get("x-teacher-key") || "";
+    await send({ ...body, action: "deleteStudent", key });
+    const data = await jsonp<ApiResult[]>({ action: "students", key });
+    if (!Array.isArray(data)) return response(data as ApiResult, 401);
+    const deletedId = String(body.studentId || "");
+    if (data.some(student => String(student.id) === deletedId)) return response({ error: "No se pudo verificar la eliminación de la cuenta." }, 503);
+    return response({ students: data });
+  }
   if (method === "POST" && url.pathname.endsWith("/api/teacher/activity-deadline")) {
     const key = new Headers(init.headers).get("x-teacher-key") || "";
     await send({ ...body, action: "setActivityDeadline", key });
     const data = await jsonp<ApiResult>({ action: "activityDeadline", id: String(body.id || ""), key });
     if ("error" in data) return response(data, 401);
-    const wanted = body.availableUntil ? new Date(String(body.availableUntil)).getTime() : null;
-    const saved = data.availableUntil ? new Date(String(data.availableUntil)).getTime() : null;
-    if (wanted !== saved) return response({ error: "No se pudo verificar la fecha de cierre guardada." }, 503);
+    const wantedFrom = body.availableFrom ? new Date(String(body.availableFrom)).getTime() : null;
+    const savedFrom = data.availableFrom ? new Date(String(data.availableFrom)).getTime() : null;
+    const wantedUntil = body.availableUntil ? new Date(String(body.availableUntil)).getTime() : null;
+    const savedUntil = data.availableUntil ? new Date(String(data.availableUntil)).getTime() : null;
+    if (wantedFrom !== savedFrom || wantedUntil !== savedUntil) return response({ error: "No se pudo verificar el periodo de disponibilidad guardado." }, 503);
     return response(data);
   }
   if (method === "POST" && url.pathname.endsWith("/api/submit")) {
