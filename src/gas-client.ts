@@ -4,6 +4,7 @@ type ApiResult = Record<string, unknown>;
 let cachedActivities = new Map<string, Activity>();
 let cachedActivity: Activity | null = null;
 const teacherKeyNames = ["platformTeacherKey", "pairTeacherKey", "diagramTeacherKey"] as const;
+const TEACHER_USERNAME_KEY = "aulaTeacherUsername";
 const STUDENT_SESSION_KEY = "aulaStudentSessionV1";
 export type StudentSessionProfile = { id:string; name?:string; givenNames:string; paternalSurname:string; maternalSurname:string; username:string };
 
@@ -30,18 +31,31 @@ export function getTeacherKey() {
   return "";
 }
 
-export function rememberTeacherKey(value: string) {
+export function rememberTeacherKey(value: string, username = "") {
   teacherKeyNames.forEach(name => {
     localStorage.setItem(name, value);
     sessionStorage.setItem(name, value);
   });
+  if (username) localStorage.setItem(TEACHER_USERNAME_KEY, username);
 }
+
+export function getTeacherUsername() { return localStorage.getItem(TEACHER_USERNAME_KEY) || "Maestro"; }
 
 export function forgetTeacherKey() {
   teacherKeyNames.forEach(name => {
     localStorage.removeItem(name);
     sessionStorage.removeItem(name);
   });
+  localStorage.removeItem(TEACHER_USERNAME_KEY);
+}
+
+export async function logoutTeacher() {
+  const token = getTeacherKey();
+  forgetTeacherKey();
+  if (token) {
+    try { await apiRequest("/api/teacher/logout", { method: "POST", body: JSON.stringify({ token }) }); }
+    catch { /* La sesión local se cierra aunque se pierda la conexión. */ }
+  }
 }
 
 function endpoint() {
@@ -155,6 +169,22 @@ export async function apiRequest(path: string, init: RequestInit = {}) {
     }
     return response({ error: "El acceso tardó demasiado. Vuelve a intentarlo." }, 503);
   }
+  if (method === "POST" && url.pathname.endsWith("/api/teacher/login")) {
+    const requestId = crypto.randomUUID();
+    await send({ action: "teacherLogin", requestId, username: String(body.username || ""), password: String(body.password || "") });
+    for (let i = 0; i < 12; i++) {
+      const data = await jsonp<ApiResult>({ action: "teacherLoginResult", requestId });
+      if (!data.pending) return response(data, "error" in data ? 401 : 200);
+      await new Promise((resolve) => window.setTimeout(resolve, 250));
+    }
+    return response({ error: "El acceso tardó demasiado. Vuelve a intentarlo." }, 503);
+  }
+  if (method === "POST" && url.pathname.endsWith("/api/teacher/logout")) {
+    const token = String(body.token || "");
+    if (token) await send({ action: "teacherLogout", token });
+    forgetTeacherKey();
+    return response({ ok: true });
+  }
   if (method === "POST" && url.pathname.endsWith("/api/teacher/students")) {
     const key = new Headers(init.headers).get("x-teacher-key") || "";
     await send({ ...body, action: "saveStudents", key });
@@ -208,6 +238,15 @@ export async function apiRequest(path: string, init: RequestInit = {}) {
     const savedUntil = data.availableUntil ? new Date(String(data.availableUntil)).getTime() : null;
     if (wantedFrom !== savedFrom || wantedUntil !== savedUntil) return response({ error: "No se pudo verificar el periodo de disponibilidad guardado." }, 503);
     return response(data);
+  }
+  if (method === "POST" && url.pathname.endsWith("/api/teacher/activity-design")) {
+    const key = new Headers(init.headers).get("x-teacher-key") || "";
+    await send({ ...body, action: "setActivityDesign", key });
+    const loaded = await jsonp<ApiResult>({ action: "activity", id: String(body.id || "") });
+    if ("error" in loaded) return response(loaded, 404);
+    if (String(loaded.cardTheme || "mint") !== String(body.theme || "mint")) return response({ error: "No se pudo verificar el diseño guardado." }, 503);
+    if (body.imageData && !loaded.coverImageUrl) return response({ error: "No se pudo confirmar la imagen de portada." }, 503);
+    return response({ id: loaded.id, coverImageUrl: loaded.coverImageUrl || loaded.imageUrl || "", cardTheme: loaded.cardTheme || "mint" });
   }
   if (method === "POST" && url.pathname.endsWith("/api/submit")) {
     const id = String(body.activityId || "digestivo-inicial");
