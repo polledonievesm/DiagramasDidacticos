@@ -1,10 +1,18 @@
 import { useEffect, useState } from "react";
 import { apiRequest, clearStudentSession, getStudentSession, saveStudentSession } from "./gas-client";
 import type { ActivityKind } from "./default-activity";
+import type { FormativeField } from "./default-activity";
+import { fieldFromCover } from "./formative-field";
 import "./student-portal.css";
 
-type PortalActivity = { id:string; title:string; instructions?:string; kind:ActivityKind; imageUrl?:string; theme?:"mint"|"sky"|"lilac"|"peach"; availableFrom:string|null; dueAt:string|null; scheduled:boolean; expired:boolean; attempts:number; bestGrade:number|null; completed:boolean };
+type PortalActivity = { id:string; title:string; instructions?:string; kind:ActivityKind; imageUrl?:string; theme?:"mint"|"sky"|"lilac"|"peach"; fieldFormative?:FormativeField|""; availableFrom:string|null; dueAt:string|null; scheduled:boolean; expired:boolean; attempts:number; bestGrade:number|null; completed:boolean };
 type PortalData = { student:{id:string;name:string;givenNames:string;paternalSurname:string;maternalSurname:string;username:string}; activities:PortalActivity[]; average:number|null; completedCount:number };
+const studentFields: { id:FormativeField; title:string; icon:string }[] = [
+  {id:"lenguajes",title:"Lenguajes",icon:"Aa"},
+  {id:"saberes",title:"Saberes y pensamiento científico",icon:"∑"},
+  {id:"etica",title:"Ética, naturaleza y sociedades",icon:"⌂"},
+  {id:"humano",title:"De lo humano y lo comunitario",icon:"♡"},
+];
 
 function activityLink(activity:PortalActivity) {
   const url=new URL(window.location.href); url.search="";
@@ -17,14 +25,14 @@ function activityLink(activity:PortalActivity) {
 function ActivityCard({item, state}:{item:PortalActivity;state:"pending"|"done"|"scheduled"|"expired"}) {
   const [imageFailed,setImageFailed]=useState(false);
   const status={pending:"Pendiente",done:"Realizada",scheduled:"Próximamente",expired:item.completed?"Cerrada · realizada":"Cerrada · pendiente"}[state];
-  const deadline=item.dueAt?`Finaliza ${new Date(item.dueAt).toLocaleString("es-MX")}`:state==="scheduled"&&item.availableFrom?`Se activa ${new Date(item.availableFrom).toLocaleString("es-MX")}`:state==="expired"&&item.dueAt?`Terminó ${new Date(item.dueAt).toLocaleString("es-MX")}`:"Sin fecha de cierre";
+  const startLabel=item.availableFrom?`${state==="scheduled"?"Se activa":"Abrió"} ${new Date(item.availableFrom).toLocaleString("es-MX")}`:"Disponible sin fecha de activación"; const endLabel=item.dueAt?`${state==="expired"?"Cerró":"Cierra"} ${new Date(item.dueAt).toLocaleString("es-MX")}`:"Sin fecha de cierre"; const deadline=`${startLabel} · ${endLabel}`;
   return <article className={`sp-card theme-${item.theme||"mint"} sp-card-${state}`}>
     <div className="sp-cover">
       {item.imageUrl&&!imageFailed&&<img src={item.imageUrl} alt={`Portada de ${item.title}`} loading="lazy" onError={()=>setImageFailed(true)}/>}
       {(!item.imageUrl||imageFailed)&&<span className="sp-cover-placeholder" aria-hidden="true">✦</span>}
     </div>
     <div className="sp-card-body">
-      <div className="sp-card-meta"><span className={`sp-card-status sp-status-${state}`}>{status}</span><span className="sp-subject">Actividad escolar</span></div>
+      <div className="sp-card-meta"><span className={`sp-card-status sp-status-${state}`}>{status}</span><span className="sp-subject">{studentFields.find(field=>field.id===item.fieldFormative)?.title||"Sin campo asignado"}</span></div>
       <h3>{item.title}</h3>
       <p>{item.instructions||"Practica y revisa lo que has aprendido."}</p>
       {state==="done"&&<div className="sp-grade-note"><span>Tu mejor calificación</span><strong>{Number(item.bestGrade||0).toFixed(1)}<small> / 10</small></strong><small>{item.attempts} {item.attempts===1?"intento":"intentos"}</small></div>}
@@ -46,12 +54,15 @@ export default function StudentPortal() {
   const [credentials,setCredentials]=useState({username:"",password:""});
   const [busy,setBusy]=useState(false);
   const [notice,setNotice]=useState("");
+  const [selectedField,setSelectedField]=useState(new URLSearchParams(window.location.search).get("campo")||"");
 
   async function load(token:string) {
     const response=await apiRequest("/api/student/portal?studentToken="+encodeURIComponent(token));
     const data=await response.json();
     if(!response.ok) throw new Error(data.error||"No se pudo abrir el portal del alumno.");
-    setPortal(data as PortalData);
+    const enriched=data as PortalData;
+    enriched.activities=enriched.activities.map(item=>({...item,fieldFormative:fieldFromCover(item.imageUrl)}));
+    setPortal(enriched);
     saveStudentSession(token,(data as PortalData).student);
   }
 
@@ -85,8 +96,11 @@ export default function StudentPortal() {
     </main>
   );
 
-  const open=portal.activities.filter(item=>!item.expired&&!item.scheduled),scheduled=portal.activities.filter(item=>item.scheduled&&!item.expired),expired=portal.activities.filter(item=>item.expired);
+  const visibleActivities=selectedField?portal.activities.filter(item=>selectedField==="sin-asignar"?!item.fieldFormative:item.fieldFormative===selectedField):portal.activities;
+  const open=visibleActivities.filter(item=>!item.expired&&!item.scheduled),scheduled=visibleActivities.filter(item=>item.scheduled&&!item.expired),expired=visibleActivities.filter(item=>item.expired);
   const pending=open.filter(item=>!item.completed),completed=open.filter(item=>item.completed);
+  const fieldAverage=(field:string)=>{const grades=portal.activities.filter(item=>(field==="sin-asignar"?!item.fieldFormative:item.fieldFormative===field)&&item.bestGrade!==null).map(item=>Number(item.bestGrade));return grades.length?grades.reduce((sum,value)=>sum+value,0)/grades.length:null;};
+  function chooseField(field:string){setSelectedField(field);const url=new URL(window.location.href);if(field)url.searchParams.set("campo",field);else url.searchParams.delete("campo");window.history.replaceState(null,"",url);}
   const initials=(portal.student.givenNames||portal.student.name||"A").slice(0,1).toLocaleUpperCase("es-MX");
   return (
     <main className="student-portal sp-dashboard">
@@ -101,10 +115,11 @@ export default function StudentPortal() {
           <div className="sp-welcome"><div><span className="sp-kicker">TU ESPACIO DE APRENDIZAJE</span><h1>¡Hola, {portal.student.givenNames||portal.student.name}!</h1><p>Estas son tus actividades. Elige una para empezar.</p></div><div className="sp-welcome-art" aria-hidden="true"><span>✦</span><i/><i/><b/></div></div>
           <div className="sp-stats">
             <a className="sp-stat sp-stat-pending" href="#pendientes"><span className="sp-stat-icon"><LineIcon name="book"/></span><span>Por realizar<strong>{pending.length}</strong></span><span className="sp-stat-arrow">›</span></a>
-            <a className="sp-stat sp-stat-done" href="#realizadas"><span className="sp-stat-icon"><LineIcon name="check"/></span><span>Realizadas<strong>{portal.completedCount}</strong></span><span className="sp-stat-arrow">›</span></a>
-            <a className="sp-stat sp-stat-average" id="promedio" href="#realizadas"><span className="sp-stat-icon"><LineIcon name="chart"/></span><span>Mi promedio<strong>{portal.average===null?"—":portal.average.toFixed(1)}<small>/10</small></strong></span><span className="sp-stat-arrow">›</span></a>
+            <a className="sp-stat sp-stat-done" href="#realizadas"><span className="sp-stat-icon"><LineIcon name="check"/></span><span>Realizadas<strong>{visibleActivities.filter(item=>item.completed).length}</strong></span><span className="sp-stat-arrow">›</span></a>
+            <a className="sp-stat sp-stat-average" id="promedio" href="#realizadas"><span className="sp-stat-icon"><LineIcon name="chart"/></span><span>{selectedField?"Promedio del campo":"Mi promedio"}<strong>{(selectedField?fieldAverage(selectedField):portal.average)===null?"—":(selectedField?fieldAverage(selectedField):portal.average)!.toFixed(1)}<small>/10</small></strong></span><span className="sp-stat-arrow">›</span></a>
           </div>
-          <section className="sp-section" id="pendientes"><div className="sp-section-heading"><h2><LineIcon name="book"/>Por realizar <span>{pending.length}</span></h2><a href="#pendientes">Ver todas <b>›</b></a></div>
+          <section className="sp-field-section"><div className="sp-section-heading"><h2><LineIcon name="book"/>Campos formativos</h2>{selectedField&&<button onClick={()=>chooseField("")}>Ver todos los campos</button>}</div><div className="sp-field-grid">{studentFields.map(field=>{const count=portal.activities.filter(item=>item.fieldFormative===field.id).length;const avg=fieldAverage(field.id);return <button className={`sp-field-card ${selectedField===field.id?"selected":""}`} key={field.id} onClick={()=>chooseField(field.id)}><span>{field.icon}</span><strong>{field.title}</strong><small>{count} {count===1?"actividad":"actividades"} · {avg===null?"sin calificaciones":`promedio ${avg.toFixed(1)}/10`}</small></button>})}{(()=>{const count=portal.activities.filter(item=>!item.fieldFormative).length;const avg=fieldAverage("sin-asignar");return count?<button className={`sp-field-card ${selectedField==="sin-asignar"?"selected":""}`} key="sin-asignar" onClick={()=>chooseField("sin-asignar")}><span>＋</span><strong>Sin campo asignado</strong><small>{count} actividades · {avg===null?"sin calificaciones":`promedio ${avg.toFixed(1)}/10`}</small></button>:null})()}</div></section>
+          <section className="sp-section" id="pendientes"><div className="sp-section-heading"><h2><LineIcon name="book"/>{selectedField?(studentFields.find(field=>field.id===selectedField)?.title||"Sin campo asignado"):"Por realizar"} <span>{pending.length}</span></h2><a href="#pendientes">Ver todas <b>›</b></a></div>
             {pending.length ? <div className="sp-grid">{pending.map(item=><ActivityCard item={item} state="pending" key={item.id}/>)}</div> : <p className="sp-empty">¡Muy bien! No tienes actividades pendientes.</p>}
           </section>
           {completed.length>0&&<section className="sp-section" id="realizadas"><div className="sp-section-heading"><h2><LineIcon name="check"/>Realizadas <span>{completed.length}</span></h2></div><div className="sp-grid sp-grid-done">{completed.map(item=><ActivityCard item={item} state="done" key={item.id}/>)}</div></section>}

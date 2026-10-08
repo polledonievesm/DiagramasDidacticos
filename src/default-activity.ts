@@ -10,6 +10,7 @@ export type FillSentence = { id: string; before: string; answer: string; after: 
 export type WordOrderSentence = { id: string; text: string; wordStyles?: Array<{ bold?: boolean; italic?: boolean; underline?: boolean }>; words?: Array<{ id: string; text: string; order: number; bold?: boolean; italic?: boolean; underline?: boolean }> };
 export type WheelEntry = { id: string; text: string; imageUrl?: string | null; imageData?: string | null };
 export type ActivityKind = "diagram" | "pairs" | "quiz" | "quiz-show" | "true-false" | "group-sort" | "sequence" | "flashcards" | "memory" | "complete-sentence" | "complete-phrase" | "word-order" | "roulette" | "word-search";
+export type FormativeField = "lenguajes" | "saberes" | "etica" | "humano";
 export type Activity = {
   kind?: ActivityKind;
   pairs?: MatchingPair[];
@@ -35,6 +36,7 @@ export type Activity = {
   maxAttempts: number | null;
   availableFrom?: string | null;
   availableUntil?: string | null;
+  fieldFormative?: FormativeField | "" | null;
   coverImageUrl?: string | null;
   cardTheme?: "mint" | "sky" | "lilac" | "peach";
   imageUrl: string;
