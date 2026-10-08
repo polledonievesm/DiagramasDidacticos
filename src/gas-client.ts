@@ -240,6 +240,21 @@ export async function apiRequest(path: string, init: RequestInit = {}) {
     if (data.some(student => String(student.id) === deletedId)) return response({ error: "No se pudo verificar la eliminación de la cuenta." }, 503);
     return response({ students: data });
   }
+  if (method === "POST" && url.pathname.endsWith("/api/teacher/students-bulk")) {
+    const key = new Headers(init.headers).get("x-teacher-key") || "";
+    const ids = (body.studentIds as string[] || []).map(String);
+    const before = await jsonp<ApiResult[] | ApiResult>({ action: "students", key });
+    if (!Array.isArray(before)) return response(before as ApiResult, 401);
+    await send({ ...body, action: "manageStudents", key });
+    const data = await jsonp<ApiResult[] | ApiResult>({ action: "students", key });
+    if (!Array.isArray(data)) return response(data as ApiResult, 401);
+    const operation = String(body.operation || "");
+    if (operation === "delete" && data.some(student => ids.includes(String(student.id)))) return response({ error: "No se pudo verificar la eliminación de todas las cuentas." }, 503);
+    if (operation !== "delete" && ids.some(id => !data.some(student => String(student.id) === id))) return response({ error: "No se pudieron verificar todas las cuentas." }, 503);
+    if (operation === "deactivate" && ids.some(id => data.find(student => String(student.id) === id)?.active !== false)) return response({ error: "No se pudo verificar la baja de todas las cuentas." }, 503);
+    if (operation === "reset" && ids.some(id => !data.find(student => String(student.id) === id)?.password)) return response({ error: "Se cambió la contraseña, pero no pudimos verificarla. Actualiza la lista." }, 503);
+    return response({ students: data });
+  }
   if (method === "POST" && url.pathname.endsWith("/api/teacher/activity-deadline")) {
     const key = new Headers(init.headers).get("x-teacher-key") || "";
     await send({ ...body, action: "setActivityDeadline", key });

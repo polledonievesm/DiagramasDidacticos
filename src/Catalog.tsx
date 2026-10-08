@@ -1,7 +1,21 @@
 import { useEffect, useMemo, useState } from "react";
 import { templateRegistry } from "./template-registry";
 import { apiRequest, getTeacherKey, getTeacherUsername, logoutTeacher } from "./gas-client";
-import TemplateIcon from "./TemplateIcon";
+import templateIllustrations from "./assets/plantillas-ilustradas.webp";
+
+const illustrationCell: Record<string, number> = {
+  "diagram-labels": 0, pairs: 1, quiz: 2, "quiz-show": 3, "true-false": 4,
+  "group-sort": 5, sequence: 6, "complete-sentence": 7, "complete-phrase": 8,
+  "word-order": 9, flashcards: 10, roulette: 11, memory: 12, "word-search": 13,
+};
+
+function Illustration({ id }: { id: string }) {
+  const cell = illustrationCell[id] ?? 0;
+  const column = cell % 4;
+  const row = Math.floor(cell / 4);
+  const position = `${column * 100 / 3}% ${row * 100 / 3}%`;
+  return <div className="catalog-art-crop" style={{ backgroundPosition: position, backgroundImage: `url(${templateIllustrations})` }} aria-hidden="true" />;
+}
 
 export default function Catalog() {
   const [search, setSearch] = useState("");
@@ -55,12 +69,12 @@ export default function Catalog() {
           const href = game.id === "diagram-labels" ? "./?modo=maestro&nueva=1" : "./?juego=" + (game.id === "pairs" ? "parejas" : game.id) + "&modo=maestro&nueva=1";
           return ready
             ? <a className="catalog-card" key={game.id} href={href}>
-                <div className={`catalog-visual icon-${game.id}`}><TemplateIcon id={game.id}/></div>
-                <div className="catalog-card-content"><span className="catalog-card-kicker">{game.kind}</span><h2>{game.title}</h2><p>{game.description}</p><strong>Crear actividad <span aria-hidden="true">→</span></strong></div>
+                <div className={`catalog-visual icon-${game.id}`}><Illustration id={game.id}/></div>
+                <div className="catalog-card-content"><span className="catalog-card-kicker">{game.kind}</span><h2>{game.title}</h2><p>{game.description}</p></div>
               </a>
             : <article className="catalog-card catalog-soon" key={game.id} aria-label={game.title + ", en preparación"}>
-                <div className={`catalog-visual icon-${game.id}`}><TemplateIcon id={game.id}/></div>
-                <div className="catalog-card-content"><span className="catalog-card-kicker">EN PREPARACIÓN</span><h2>{game.title}</h2><p>{game.description}</p><strong>Próximamente</strong></div>
+                <div className={`catalog-visual icon-${game.id}`}><Illustration id={game.id}/></div>
+                <div className="catalog-card-content"><span className="catalog-card-kicker">EN PREPARACIÓN</span><h2>{game.title}</h2><p>{game.description}</p></div>
               </article>;
         })}{!matches.length && <p className="catalog-empty">No encontré un juego con ese nombre.</p>}</div>
       </section>

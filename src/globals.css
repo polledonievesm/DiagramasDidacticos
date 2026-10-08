@@ -13,6 +13,74 @@
 .roster-import{display:grid;gap:10px;margin:20px 0}.roster-input{width:100%;resize:vertical;border:1px solid #d3e0eb;border-radius:12px;background:#fff;padding:12px 14px;color:var(--ink);font:500 14px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace}.roster-input:focus{outline:none;border-color:#59a2de;box-shadow:0 0 0 3px #e2f2ff}.account-section .table-wrap{margin-top:16px}.account-section .results-heading{align-items:flex-start}
 @media(max-width:600px){.account-section{padding:14px}.account-section .table-wrap{max-width:calc(100vw - 60px)}.account-section .save-row{align-items:stretch}.account-section .save-row button{width:100%}}
 
+/* Encabezado docente fijo y gestión compacta de alumnos */
+.teacher-topbar{position:sticky;top:0;z-index:40;min-height:70px;height:auto;justify-content:flex-start;gap:0;box-shadow:0 5px 18px rgba(34,65,91,.07)}
+.teacher-nav{width:auto;min-width:0;flex:1;margin:0 0 0 clamp(25px,4vw,58px);padding:0;border:0;gap:clamp(4px,1vw,14px);overflow-x:auto;scrollbar-width:thin;white-space:nowrap}
+.teacher-nav a,.teacher-nav button{display:inline-flex;align-items:center;gap:7px;flex:0 0 auto;border:0;border-bottom:3px solid transparent;border-radius:0;background:transparent;padding:13px 10px;color:#61768a;font-size:14px;font-weight:750}
+.teacher-nav a span,.teacher-nav button span{display:grid;place-items:center;width:20px;height:20px;border-radius:6px;background:#edf5fa;color:#33759e;font-size:17px;line-height:1}
+.teacher-nav a.active,.teacher-nav button.active{border-bottom-color:#2183ca;color:#1b6496}
+.teacher-nav .quiet{margin-left:0}
+.teacher-nav .quiet:hover,.teacher-nav a:hover,.teacher-nav button:hover{color:#1b6496;background:#f3f8fc}
+.account-section{margin-bottom:34px}
+.account-section .results-heading{margin-bottom:12px}
+.account-section .results-heading h1{font-family:"Century Gothic",CenturyGothic,AppleGothic,sans-serif;font-size:30px}
+.roster-actions{display:flex;align-items:center;gap:12px;margin:14px 0 18px}
+.roster-actions>.secondary,.roster-import>summary{min-height:42px;padding:9px 15px;border:1px solid #cce3f5;border-radius:10px;background:#e6f2fb;color:#155f98;font-size:14px;font-weight:800;cursor:pointer;list-style:none}
+.roster-import{display:block;margin:0}
+.roster-import>summary::-webkit-details-marker{display:none}
+.roster-import[open]{width:100%;padding:14px;border:1px solid #dce8f0;border-radius:14px;background:#f9fcfe}
+.roster-import-body{display:grid;gap:8px;margin-top:13px}
+.roster-import-body .save-row{margin-top:2px}
+.roster-toolbar{display:flex;align-items:end;gap:12px;flex-wrap:wrap;margin:10px 0 12px}
+.roster-toolbar label{display:grid;gap:4px;color:#53697c;font-size:12px;font-weight:750}
+.roster-toolbar input,.roster-toolbar select{min-width:180px;border:1px solid #d3e0eb;border-radius:9px;background:#fff;padding:8px 10px;color:var(--ink)}
+.roster-toolbar>span{margin-left:auto;padding:8px;color:#6e8090;font-size:13px}
+.student-bulkbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 12px;margin:10px 0 14px;border:1px solid #dce8ef;border-radius:12px;background:#f8fbfd}
+.student-bulkbar>label{display:flex;align-items:center;gap:7px;color:#3e596e;font-size:13px;font-weight:750}
+.student-bulkbar>span{margin-right:auto;color:#718292;font-size:12px}
+.student-bulkbar .small-button{border-radius:8px;padding:8px 10px;background:#fff;border:1px solid #dce6ee}
+.student-card-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+.student-account-card{min-width:0;padding:15px;border:1px solid #dce8ef;border-radius:15px;background:#fff;box-shadow:0 5px 16px rgba(37,73,101,.055)}
+.student-account-card h2{margin:11px 0 3px;font-size:16px;line-height:1.3;overflow-wrap:anywhere}
+.student-select{display:flex;align-items:center;gap:7px;color:#63788b;font-size:11px;font-weight:750}
+.student-select input,.student-bulkbar input,.credential-modal input{width:16px;height:16px;accent-color:#2385c5}
+.student-username{margin:0 0 12px;color:#61758a;font-size:12px;overflow-wrap:anywhere}
+.student-username strong{color:#2c536e}
+.student-password{display:grid;gap:3px;min-height:59px;padding:9px 10px;border-radius:9px;background:#f1f8fc}
+.student-password span{color:#71869a;font-size:10px;font-weight:800;letter-spacing:.05em;text-transform:uppercase}
+.student-password strong{font-size:14px;overflow-wrap:anywhere;color:#24394a}
+.student-card-actions{display:flex;align-items:center;justify-content:space-between;gap:2px;margin-top:10px;border-top:1px solid #edf1f4;padding-top:7px}
+.student-card-actions .small-button{font-size:11px;padding:6px 4px}
+.student-card-actions .remove-button{color:#ad5360}
+.credential-modal-backdrop{position:fixed;inset:0;z-index:100;display:grid;place-items:center;padding:18px;background:rgba(24,39,54,.48);backdrop-filter:blur(3px)}
+.credential-modal{display:grid;grid-template-rows:auto auto minmax(100px,1fr) auto;width:min(650px,100%);max-height:min(82vh,760px);padding:22px;border:1px solid #dbe7ee;border-radius:19px;background:#fff;box-shadow:0 22px 70px rgba(10,29,47,.28)}
+.credential-modal-heading{display:flex;justify-content:space-between;gap:15px}.credential-modal-heading h2{margin:5px 0;font-size:23px}.credential-modal-heading p{margin:0 0 12px;color:#63788b;font-size:13px}
+.modal-close{width:34px;height:34px;border:0;border-radius:50%;background:#edf4f8;color:#4f6779;font-size:25px;line-height:1}
+.credential-modal-tools{display:flex;align-items:center;gap:12px;padding:9px 0;border-top:1px solid #e9eef2;border-bottom:1px solid #e9eef2}.credential-modal-tools span{margin-left:auto;color:#718293;font-size:12px}
+.credential-modal-list{overflow:auto;display:grid;align-content:start;gap:2px;padding:8px 0}
+.credential-modal-list label{display:grid;grid-template-columns:18px minmax(0,1fr) auto;align-items:center;gap:9px;padding:9px 5px;border-bottom:1px solid #f0f3f5;cursor:pointer}
+.credential-modal-list label span{font-size:13px;font-weight:700}.credential-modal-list label small{color:#718293;font-size:11px}
+.credential-modal-footer{display:flex;justify-content:flex-end;gap:9px;padding-top:12px;border-top:1px solid #e9eef2}
+@media(max-width:1100px){.student-card-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:780px){.teacher-topbar{align-items:flex-start;flex-wrap:wrap;padding:8px 16px}.teacher-topbar .brand{min-height:38px}.teacher-nav{flex-basis:100%;margin:2px 0 -7px;gap:3px}.teacher-nav a,.teacher-nav button{padding:8px 8px;font-size:12px}.student-card-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.roster-toolbar>span{margin-left:0}}
+@media(max-width:520px){.student-card-grid{grid-template-columns:1fr}.roster-actions{align-items:stretch;flex-direction:column}.roster-actions>.secondary,.roster-import>summary{text-align:center}.student-bulkbar{gap:5px}.student-bulkbar>span{width:100%;margin:0}.student-bulkbar .small-button{font-size:11px}.credential-modal{padding:16px}.credential-modal-heading h2{font-size:19px}.credential-modal-list label{grid-template-columns:18px minmax(0,1fr)}.credential-modal-list label small{grid-column:2}.credential-modal-footer{flex-direction:column-reverse}.credential-modal-footer button{width:100%}}
+
+/* Actividades con ilustración propia y tarjetas compactas */
+.catalog-main{width:min(1380px,calc(100% - 40px))}
+.catalog-grid{grid-template-columns:repeat(3,minmax(0,435px));justify-content:center;gap:14px}
+.catalog-card{position:relative;width:100%;height:112px;min-height:112px;gap:12px;padding:9px 11px;border-radius:13px}
+a.catalog-card:hover,a.catalog-card:focus-visible{z-index:2;transform:translateY(-3px) scale(1.025);border-color:#64a57f;background:#f5fbf6;box-shadow:0 15px 30px rgba(45,101,66,.23),0 0 0 2px rgba(92,156,116,.18)}
+.catalog-card:active{transform:translateY(-1px) scale(1.01)}
+.catalog-visual{position:relative;flex:0 0 92px;width:92px;height:92px;min-height:92px;align-self:center;border-radius:11px;background:#edf2eb;overflow:hidden}
+.catalog-art-crop{width:100%;height:100%;border-radius:inherit;background-repeat:no-repeat;background-size:400% 400%}
+.catalog-card-content{min-width:0;justify-content:center}
+.catalog-card-kicker{margin:0 0 3px;font-size:9px}
+.catalog-card h2{font-family:"Century Gothic",CenturyGothic,AppleGothic,sans-serif;font-size:18px;font-weight:700;line-height:1.18;letter-spacing:0}
+.catalog-card p{display:-webkit-box;overflow:hidden;-webkit-box-orient:vertical;-webkit-line-clamp:2;margin:4px 0 0;font-size:12px;line-height:1.25}
+.catalog-soon{opacity:.76}
+@media(max-width:980px){.catalog-grid{grid-template-columns:repeat(2,minmax(0,435px))}}
+@media(max-width:600px){.catalog-main{width:calc(100% - 24px)}.catalog-grid{grid-template-columns:minmax(0,435px);gap:10px}.catalog-card{height:112px;min-height:112px;padding:9px}.catalog-visual{flex-basis:90px;width:90px;height:90px}.catalog-card h2{font-size:18px}.catalog-card p{font-size:12px}}
+
 /* Portada del catálogo */
 .catalog-page{min-height:100vh;background:#f5f6f1;color:#26352e}
 .catalog-header{height:72px;display:flex;align-items:center;justify-content:space-between;padding:0 clamp(18px,6vw,84px);border-bottom:1px solid #e1e7de;background:rgba(250,251,247,.94)}
