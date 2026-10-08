@@ -111,6 +111,20 @@
 .teacher-page .student-card-grid .student-account-card{border-color:#dce6dc;background:#fffefa;box-shadow:0 4px 15px rgba(45,72,52,.06)}
 @media(max-width:780px){.teacher-topbar{padding:8px 13px}.teacher-tabs.teacher-nav{flex-basis:100%;margin:2px 0 -7px}.teacher-nav a,.teacher-nav button{padding:8px 8px;font-size:12px}}
 
+/* Compact illustrated game chooser: each full card is the activity link. */
+.am-template-grid{grid-template-columns:repeat(3,minmax(0,435px));justify-content:center;gap:14px;margin-top:4px}
+.am-template-card{box-sizing:border-box;width:100%;height:112px;min-height:112px;grid-template-columns:92px minmax(0,1fr);grid-template-rows:auto auto;align-content:center;align-items:center;gap:3px 12px;padding:9px 11px;border-radius:13px;background:#fffdf8}
+.am-template-card .am-template-symbol{box-sizing:border-box;grid-column:1;grid-row:1/3;width:92px;height:92px;overflow:hidden;border-radius:10px;background:#f2f1e9}
+.am-template-art-crop{display:block;width:100%;height:100%;border-radius:inherit;background-repeat:no-repeat;background-size:400% 400%}
+.am-template-card b{grid-column:2;align-self:end;margin:0;font-family:"Century Gothic",CenturyGothic,AppleGothic,sans-serif;font-size:18px;line-height:1.18;letter-spacing:0;color:#263a30}
+.am-template-card small{grid-column:2;align-self:start;display:-webkit-box;overflow:hidden;-webkit-box-orient:vertical;-webkit-line-clamp:2;margin:3px 0 0;font-size:12px;line-height:1.25;color:#697970}
+.am-template-card:hover,.am-template-card:focus-visible{transform:translateY(-2px);border:2px solid #5c9c74;background:#f5fbf6;box-shadow:0 12px 26px rgba(45,101,66,.22),0 0 0 2px rgba(92,156,116,.15);outline:none}
+.am-template-card:hover:before,.am-template-card:focus-visible:before{top:8px;bottom:8px;width:4px;z-index:2}
+.am-template-card .am-template-symbol{color:inherit}
+@media(max-width:1400px){.am-template-grid{grid-template-columns:repeat(2,minmax(0,435px))}}
+@media(max-width:900px){.am-template-grid{grid-template-columns:minmax(0,435px)}}
+@media(max-width:600px){.am-template-grid{grid-template-columns:minmax(0,435px);gap:10px}.am-template-card{height:112px;min-height:112px;grid-template-columns:90px minmax(0,1fr);grid-template-rows:auto auto;padding:9px}.am-template-card .am-template-symbol{width:90px;height:90px}.am-template-card b{font-size:18px}.am-template-card small{font-size:12px}}
+
 /* Keep the legacy student-management screen visually aligned with the teacher workspace. */
 .teacher-page{min-height:100vh;background:radial-gradient(ellipse at 8% 2%,#eaf4e9 0,transparent 36%),#f7f8f4;color:#263b36}
 .teacher-topbar{position:sticky;top:0;z-index:50;min-height:72px;height:auto;padding:0 clamp(18px,5vw,72px);border-bottom:1px solid #dce7dc;background:rgba(255,254,250,.97);box-shadow:0 4px 16px rgba(39,69,48,.07);backdrop-filter:blur(12px)}

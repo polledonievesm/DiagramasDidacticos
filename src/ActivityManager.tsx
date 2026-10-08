@@ -3,7 +3,7 @@ import type { Activity, FormativeField } from "./default-activity";
 import { templateRegistry } from "./template-registry";
 import { apiRequest, forgetTeacherKey, getTeacherKey, getTeacherUsername, logoutTeacher, rememberTeacherKey } from "./gas-client";
 import { activityCover, activityTheme } from "./activity-visual";
-import TemplateIcon from "./TemplateIcon";
+import templateIllustrations from "./assets/plantillas-ilustradas.webp";
 import { coverWithField, fieldFromCover } from "./formative-field";
 import "./activity-manager.css";
 
@@ -83,6 +83,20 @@ function HeaderIcon({name}:{name:"activities"|"results"|"students"|"create"}) {
   const common={fill:"none",stroke:"currentColor",strokeWidth:1.8,strokeLinecap:"round" as const,strokeLinejoin:"round" as const};
   const shapes={activities:<><rect x="4" y="4" width="7" height="7" rx="1.5" {...common}/><rect x="13" y="4" width="7" height="7" rx="1.5" {...common}/><rect x="4" y="13" width="7" height="7" rx="1.5" {...common}/><rect x="13" y="13" width="7" height="7" rx="1.5" {...common}/></>,results:<><path d="M4 19V5m0 14h17" {...common}/><path d="m7 15 4-4 3 2 5-6" {...common}/></>,students:<><circle cx="9" cy="8" r="3" {...common}/><path d="M3 20v-1a6 6 0 0 1 12 0v1m2-9a3 3 0 1 0 0-6m1 9a5 5 0 0 1 3 5" {...common}/></>,create:<><path d="M12 5v14M5 12h14" {...common}/></>};
   return <svg className="am-nav-icon" viewBox="0 0 24 24" aria-hidden="true">{shapes[name]}</svg>;
+}
+
+const illustrationCell: Record<string, number> = {
+  "diagram-labels": 0, pairs: 1, quiz: 2, "quiz-show": 3, "true-false": 4,
+  "group-sort": 5, sequence: 6, "complete-sentence": 7, "complete-phrase": 8,
+  "word-order": 9, flashcards: 10, roulette: 11, memory: 12, "word-search": 13,
+};
+
+function TemplateIllustration({ id }: { id: string }) {
+  const cell = illustrationCell[id] ?? 0;
+  const column = cell % 4;
+  const row = Math.floor(cell / 4);
+  const position = `${column * 100 / 3}% ${row * 100 / 3}%`;
+  return <span className="am-template-art-crop" style={{ backgroundPosition: position, backgroundImage: `url(${templateIllustrations})` }} aria-hidden="true" />;
 }
 
 export default function ActivityManager() {
@@ -383,7 +397,7 @@ export default function ActivityManager() {
       </section> : section === "create" ? <>
       <div className="am-heading"><div><span className="am-kicker">NUEVA ACTIVIDAD</span><h1>Elige una plantilla</h1><p>Al elegir un tipo de juego, se abrirá directamente su editor.</p></div><a className="am-back-link" href="?panel=actividades">← Mis actividades</a></div>
       {notice&&<p className="am-notice" role="status">{notice}</p>}
-            <section className="am-create" id="crear"><div className="am-template-grid">{available.map(template=><a key={template.id} className="am-template-card" href={editorUrl(undefined,template.id)}><span className="am-template-symbol"><TemplateIcon id={template.id}/></span><b>{template.title}</b><small>{template.description}</small><strong>Crear actividad <span aria-hidden="true">→</span></strong></a>)}</div>
+            <section className="am-create" id="crear"><div className="am-template-grid">{available.map(template=><a key={template.id} className="am-template-card" href={editorUrl(undefined,template.id)}><span className="am-template-symbol"><TemplateIllustration id={template.id}/></span><b>{template.title}</b><small>{template.description}</small></a>)}</div>
       <details className="am-planned"><summary>Plantillas en preparación ({planned.length + templateRegistry.filter(template => template.status === "ready" && !supportedKinds.includes(template.id === "diagram-labels" ? "diagram" : template.id)).length})</summary><div>{[...planned,...templateRegistry.filter(template => template.status === "ready" && !supportedKinds.includes(template.id === "diagram-labels" ? "diagram" : template.id))].map(template=><span key={template.id}>{template.title}</span>)}</div></details></section>
       </> : <>
       <div className="am-heading"><div><span className="am-kicker">TU ESPACIO DE TRABAJO</span><h1>Mis actividades</h1><p>Abre, edita y comparte las actividades que has creado.</p></div><div className="am-heading-actions"><button className="am-refresh" onClick={()=>void refresh()} disabled={busy}>Actualizar lista</button><a className="am-primary" href="?panel=actividades&seccion=crear">＋ Crear actividad</a></div></div>
