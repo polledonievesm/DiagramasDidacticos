@@ -90,3 +90,43 @@
 .account-section .student-actions button{font-size:12px!important;padding:7px 9px!important}
 .account-section .student-actions .remove-button{font-size:11px!important;padding:6px 8px!important}
 @media(max-width:650px){.account-section .roster-toolbar label,.account-section .roster-toolbar input,.account-section .roster-toolbar select{width:100%;min-width:0;box-sizing:border-box}.account-section .roster-toolbar>span{margin:0}.account-section .results-heading h1{font-size:28px}}
+
+/* Match the student-management screen to the newer green teacher workspace. */
+.teacher-page{min-height:100vh;background:radial-gradient(ellipse at 8% 2%,#eaf4e9 0,transparent 36%),#f7f8f4;color:#263b36}
+.teacher-topbar{position:sticky;top:0;z-index:50;min-height:72px;height:auto;padding:0 clamp(18px,5vw,72px);border-bottom:1px solid #dce7dc;background:rgba(255,254,250,.97);box-shadow:0 4px 16px rgba(39,69,48,.07);backdrop-filter:blur(12px)}
+.teacher-topbar .brand-mark{background:#55796d;color:#fff;box-shadow:inset 0 -3px 0 rgba(0,0,0,.12)}
+.teacher-tabs.teacher-nav{width:auto;max-width:none;flex:1;margin:0 0 0 clamp(22px,3vw,48px);padding:0;border:0;gap:clamp(3px,.8vw,12px);overflow-x:auto;white-space:nowrap}
+.teacher-nav a,.teacher-nav button{display:inline-flex;align-items:center;gap:7px;flex:0 0 auto;padding:13px 10px;border:0;border-bottom:3px solid transparent;border-radius:0;background:transparent;color:#596c62;font-size:13px;font-weight:750}
+.teacher-nav a span,.teacher-nav button span{display:grid;place-items:center;width:auto;height:auto;border:0;border-radius:0;background:transparent;color:inherit;font-size:inherit;line-height:1}
+.teacher-nav-icon{width:18px;height:18px;flex:0 0 18px}
+.teacher-nav a.active,.teacher-nav button.active{border-bottom-color:#4b966a;color:#267653}
+.teacher-nav a:hover,.teacher-nav button:hover{background:#f1f6f0;color:#267653}
+.teacher-nav .quiet{margin-left:0}
+.teacher-page .access-card,.teacher-page .account-section,.teacher-page .editor-main,.teacher-page .editor-preview,.teacher-page .results-section{border-color:#dce6dc;background:#fffefa;box-shadow:0 8px 26px rgba(45,72,52,.07)}
+.teacher-page .primary{background:#267653;box-shadow:0 6px 15px rgba(38,118,83,.16)}
+.teacher-page .primary:hover{background:#1f6245}
+.teacher-page .secondary{border-color:#d5e3d7;background:#f5f8f3;color:#41674f}
+.teacher-page .student-bulkbar,.teacher-page .roster-import[open]{border-color:#dce7dc;background:#f7faf5}
+.teacher-page .student-password{background:#f1f6ef}
+.teacher-page .student-card-grid .student-account-card{border-color:#dce6dc;background:#fffefa;box-shadow:0 4px 15px rgba(45,72,52,.06)}
+@media(max-width:780px){.teacher-topbar{padding:8px 13px}.teacher-tabs.teacher-nav{flex-basis:100%;margin:2px 0 -7px}.teacher-nav a,.teacher-nav button{padding:8px 8px;font-size:12px}}
+
+/* Keep the legacy student-management screen visually aligned with the teacher workspace. */
+.teacher-page{min-height:100vh;background:radial-gradient(ellipse at 8% 2%,#eaf4e9 0,transparent 36%),#f7f8f4;color:#263b36}
+.teacher-topbar{position:sticky;top:0;z-index:50;min-height:72px;height:auto;padding:0 clamp(18px,5vw,72px);border-bottom:1px solid #dce7dc;background:rgba(255,254,250,.97);box-shadow:0 4px 16px rgba(39,69,48,.07);backdrop-filter:blur(12px)}
+.teacher-topbar .brand-mark{background:#55796d;color:#fff;box-shadow:inset 0 -3px 0 rgba(0,0,0,.12)}
+.teacher-tabs.teacher-nav{width:auto;max-width:none;flex:1;margin:0 0 0 clamp(22px,3vw,48px);padding:0;border:0;gap:clamp(3px,.8vw,12px);overflow-x:auto;white-space:nowrap}
+.teacher-nav a,.teacher-nav button{display:inline-flex;align-items:center;gap:7px;flex:0 0 auto;padding:13px 10px;border:0;border-bottom:3px solid transparent;border-radius:0;background:transparent;color:#596c62;font-size:13px;font-weight:750}
+.teacher-nav a span,.teacher-nav button span{display:grid;place-items:center;width:auto;height:auto;border:0;border-radius:0;background:transparent;color:inherit;font-size:inherit;line-height:1}
+.teacher-nav-icon{width:18px;height:18px;flex:0 0 18px}
+.teacher-nav a.active,.teacher-nav button.active{border-bottom-color:#4b966a;color:#267653}
+.teacher-nav a:hover,.teacher-nav button:hover{background:#f1f6f0;color:#267653}
+.teacher-nav .quiet{margin-left:0}
+.teacher-page .access-card,.teacher-page .account-section,.teacher-page .editor-main,.teacher-page .editor-preview,.teacher-page .results-section{border-color:#dce6dc;background:#fffefa;box-shadow:0 8px 26px rgba(45,72,52,.07)}
+.teacher-page .primary{background:#267653;box-shadow:0 6px 15px rgba(38,118,83,.16)}
+.teacher-page .primary:hover{background:#1f6245}
+.teacher-page .secondary{border-color:#d5e3d7;background:#f5f8f3;color:#41674f}
+.teacher-page .student-bulkbar,.teacher-page .roster-import[open]{border-color:#dce7dc;background:#f7faf5}
+.teacher-page .student-password{background:#f1f6ef}
+.teacher-page .student-card-grid .student-account-card{border-color:#dce6dc;background:#fffefa;box-shadow:0 4px 15px rgba(45,72,52,.06)}
+@media(max-width:780px){.teacher-topbar{padding:8px 13px}.teacher-tabs.teacher-nav{flex-basis:100%;margin:2px 0 -7px}.teacher-nav a,.teacher-nav button{padding:8px 8px;font-size:12px}}

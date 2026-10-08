@@ -56,6 +56,7 @@
 .am-card-image{display:grid;place-items:center;aspect-ratio:16/9;max-height:185px;margin:-18px -18px 14px;overflow:hidden;border-radius:17px 17px 0 0;background:#edf5ec}
 .am-card-image img{width:100%;height:100%;object-fit:contain}
 .am-image-placeholder{color:#678273;font-size:13px;font-weight:800;letter-spacing:.08em}
+.am-card-image.am-image-unavailable::after{content:"La portada no se pudo cargar. Vuelve a subirla y guarda el diseño.";max-width:360px;padding:18px;color:#65796b;text-align:center;font-size:13px;font-weight:700;line-height:1.5}
 .am-activity-card.theme-sky .am-card-image{background:#edf5f8}
 .am-activity-card.theme-lilac .am-card-image{background:#f2eff8}
 .am-activity-card.theme-peach .am-card-image{background:#fbf0e8}
