@@ -14,6 +14,32 @@ function activityLink(activity:PortalActivity) {
   return url.toString();
 }
 
+function ActivityCard({item, state}:{item:PortalActivity;state:"pending"|"done"|"scheduled"|"expired"}) {
+  const [imageFailed,setImageFailed]=useState(false);
+  const status={pending:"Pendiente",done:"Realizada",scheduled:"Próximamente",expired:item.completed?"Cerrada · realizada":"Cerrada · pendiente"}[state];
+  const deadline=item.dueAt?`Finaliza ${new Date(item.dueAt).toLocaleString("es-MX")}`:state==="scheduled"&&item.availableFrom?`Se activa ${new Date(item.availableFrom).toLocaleString("es-MX")}`:state==="expired"&&item.dueAt?`Terminó ${new Date(item.dueAt).toLocaleString("es-MX")}`:"Sin fecha de cierre";
+  return <article className={`sp-card theme-${item.theme||"mint"} sp-card-${state}`}>
+    <div className="sp-cover">
+      {item.imageUrl&&!imageFailed&&<img src={item.imageUrl} alt={`Portada de ${item.title}`} loading="lazy" onError={()=>setImageFailed(true)}/>}
+      {(!item.imageUrl||imageFailed)&&<span className="sp-cover-placeholder" aria-hidden="true">✦</span>}
+    </div>
+    <div className="sp-card-body">
+      <div className="sp-card-meta"><span className={`sp-card-status sp-status-${state}`}>{status}</span><span className="sp-subject">Actividad escolar</span></div>
+      <h3>{item.title}</h3>
+      <p>{item.instructions||"Practica y revisa lo que has aprendido."}</p>
+      {state==="done"&&<div className="sp-grade-note"><span>Tu mejor calificación</span><strong>{Number(item.bestGrade||0).toFixed(1)}<small> / 10</small></strong><small>{item.attempts} {item.attempts===1?"intento":"intentos"}</small></div>}
+      {state==="expired"&&item.completed&&<div className="sp-grade-note"><span>Mejor calificación</span><strong>{Number(item.bestGrade||0).toFixed(1)}<small> / 10</small></strong></div>}
+      <div className="sp-card-bottom"><small>{deadline}</small>{state==="pending"&&<a href={activityLink(item)}>Comenzar <span aria-hidden="true">→</span></a>}{state==="done"&&<a className="sp-secondary-link" href={activityLink(item)}>Volver a practicar</a>}</div>
+    </div>
+  </article>;
+}
+
+function LineIcon({name}:{name:"home"|"book"|"check"|"chart"|"calendar"|"logout"}) {
+  const common={fill:"none",stroke:"currentColor",strokeWidth:1.8,strokeLinecap:"round" as const,strokeLinejoin:"round" as const};
+  const paths={home:<><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-6v-7h-4v7H4a1 1 0 0 1-1-1z" {...common}/></>,book:<><path d="M4 5.5A3.5 3.5 0 0 1 7.5 2H20v18H7.5A3.5 3.5 0 0 0 4 23zM4 5.5v17.5M8 7h8M8 11h8" {...common}/></>,check:<><circle cx="12" cy="12" r="9" {...common}/><path d="m8 12 2.5 2.5L16 9" {...common}/></>,chart:<><path d="M4 20V10h4v10zm6 0V4h4v16zm6 0v-7h4v7z" {...common}/></>,calendar:<><rect x="3" y="5" width="18" height="16" rx="2" {...common}/><path d="M7 3v4m10-4v4M3 10h18m-13 4h2m3 0h2m-7 3h2" {...common}/></>,logout:<><path d="M10 17l5-5-5-5m5 5H3m9-9h7a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-7" {...common}/></>};
+  return <svg className="sp-icon" viewBox="0 0 24 24" aria-hidden="true">{paths[name]}</svg>;
+}
+
 export default function StudentPortal() {
   const [session,setSession]=useState(getStudentSession);
   const [portal,setPortal]=useState<PortalData|null>(null);
@@ -46,8 +72,8 @@ export default function StudentPortal() {
   function signOut() { clearStudentSession();setSession(null);setPortal(null);setNotice(""); }
 
   if(!portal) return (
-    <main className="student-portal">
-      <header className="sp-header"><a href="./">Aula en juego</a><span>Espacio del alumno</span></header>
+    <main className="student-portal sp-login-view">
+      <header className="sp-login-header"><a className="sp-brand" href="./"><span className="sp-brand-mark">✦</span>Aula en juego</a><span>Espacio del alumno</span></header>
       <form className="sp-login" onSubmit={signIn}>
         <span className="sp-kicker">ACCESO DEL ALUMNO</span><h1>Entra a tus actividades</h1>
         <p>Usa el usuario y la contraseña que te entregó tu maestro.</p>
@@ -60,45 +86,32 @@ export default function StudentPortal() {
   );
 
   const open=portal.activities.filter(item=>!item.expired&&!item.scheduled),scheduled=portal.activities.filter(item=>item.scheduled&&!item.expired),expired=portal.activities.filter(item=>item.expired);
+  const pending=open.filter(item=>!item.completed),completed=open.filter(item=>item.completed);
+  const initials=(portal.student.givenNames||portal.student.name||"A").slice(0,1).toLocaleUpperCase("es-MX");
   return (
-    <main className="student-portal">
-      <header className="sp-header"><a href="./">Aula en juego</a><span>Espacio del alumno</span><button onClick={signOut}>Cerrar sesión</button></header>
-      <section className="sp-main">
-        <div className="sp-welcome">
-          <div><span className="sp-kicker">MI APRENDIZAJE</span><h1>Hola, {portal.student.name} {portal.student.paternalSurname}</h1><p>Revisa tus actividades y continúa aprendiendo.</p></div>
-          <div className="sp-average"><span>Promedio de actividades realizadas</span><strong>{portal.average===null?"—":portal.average.toFixed(1)}<small>/10</small></strong><small>{portal.completedCount} realizadas de {portal.activities.length}</small></div>
-        </div>
-        <section className="sp-section">
-          <h2>Actividades disponibles <span>{open.length}</span></h2>
-          {open.length ? <div className="sp-grid">{open.map(item => (
-            <article className={`sp-card theme-${item.theme||"mint"}`} key={item.id}>
-              <div className="sp-cover">{item.imageUrl?<img src={item.imageUrl} alt={`Imagen de ${item.title}`} loading="lazy"/>:<span aria-hidden="true">✦</span>}</div>
-              <div className="sp-card-status">{item.completed ? "Realizada" : "Pendiente"}</div>
-              <h3>{item.title}</h3>
-              <p>{item.instructions || (item.completed ? `Tu mejor calificación: ${Number(item.bestGrade).toFixed(1)} / 10 · ${item.attempts} ${item.attempts===1 ? "intento" : "intentos"}` : "Aún no la has realizado.")}</p>
-              {item.completed&&<p className="sp-grade-note">Tu mejor calificación: {Number(item.bestGrade).toFixed(1)} / 10 · {item.attempts} {item.attempts===1?"intento":"intentos"}</p>}
-              <small>{item.dueAt ? `Finaliza ${new Date(item.dueAt).toLocaleString("es-MX")}` : "Sin fecha de cierre"}</small>
-              <a href={activityLink(item)}>{item.completed ? "Volver a practicar" : "Comenzar actividad"} →</a>
-            </article>
-          ))}</div> : <p className="sp-empty">No tienes actividades disponibles por ahora.</p>}
+    <main className="student-portal sp-dashboard">
+      <aside className="sp-sidebar">
+        <a className="sp-brand" href="./"><span className="sp-brand-mark">✦</span><span>Aula<br/>en juego</span></a>
+        <nav aria-label="Menú del alumno"><a className="active" href="#inicio"><LineIcon name="home"/>Inicio</a><a href="#pendientes"><LineIcon name="book"/>Mis actividades</a><a href="#realizadas"><LineIcon name="check"/>Realizadas</a><a href="#promedio"><LineIcon name="chart"/>Mi promedio</a></nav>
+        <button className="sp-logout" onClick={signOut}><LineIcon name="logout"/>Cerrar sesión</button>
+      </aside>
+      <div className="sp-dashboard-content">
+        <header className="sp-topbar"><span>Mi espacio de aprendizaje</span><div className="sp-profile"><span className="sp-avatar">{initials}</span><span><strong>{portal.student.givenNames} {portal.student.paternalSurname}</strong><small>Alumno</small></span><button onClick={signOut} aria-label="Cerrar sesión"><LineIcon name="logout"/></button></div></header>
+        <section className="sp-main" id="inicio">
+          <div className="sp-welcome"><div><span className="sp-kicker">TU ESPACIO DE APRENDIZAJE</span><h1>¡Hola, {portal.student.givenNames||portal.student.name}!</h1><p>Estas son tus actividades. Elige una para empezar.</p></div><div className="sp-welcome-art" aria-hidden="true"><span>✦</span><i/><i/><b/></div></div>
+          <div className="sp-stats">
+            <a className="sp-stat sp-stat-pending" href="#pendientes"><span className="sp-stat-icon"><LineIcon name="book"/></span><span>Por realizar<strong>{pending.length}</strong></span><span className="sp-stat-arrow">›</span></a>
+            <a className="sp-stat sp-stat-done" href="#realizadas"><span className="sp-stat-icon"><LineIcon name="check"/></span><span>Realizadas<strong>{portal.completedCount}</strong></span><span className="sp-stat-arrow">›</span></a>
+            <a className="sp-stat sp-stat-average" id="promedio" href="#realizadas"><span className="sp-stat-icon"><LineIcon name="chart"/></span><span>Mi promedio<strong>{portal.average===null?"—":portal.average.toFixed(1)}<small>/10</small></strong></span><span className="sp-stat-arrow">›</span></a>
+          </div>
+          <section className="sp-section" id="pendientes"><div className="sp-section-heading"><h2><LineIcon name="book"/>Por realizar <span>{pending.length}</span></h2><a href="#pendientes">Ver todas <b>›</b></a></div>
+            {pending.length ? <div className="sp-grid">{pending.map(item=><ActivityCard item={item} state="pending" key={item.id}/>)}</div> : <p className="sp-empty">¡Muy bien! No tienes actividades pendientes.</p>}
+          </section>
+          {completed.length>0&&<section className="sp-section" id="realizadas"><div className="sp-section-heading"><h2><LineIcon name="check"/>Realizadas <span>{completed.length}</span></h2></div><div className="sp-grid sp-grid-done">{completed.map(item=><ActivityCard item={item} state="done" key={item.id}/>)}</div></section>}
+          {scheduled.length>0&&<section className="sp-section"><div className="sp-section-heading"><h2><LineIcon name="calendar"/>Programadas <span>{scheduled.length}</span></h2></div><div className="sp-grid">{scheduled.map(item=><ActivityCard item={item} state="scheduled" key={item.id}/>)}</div></section>}
+          {expired.length>0&&<section className="sp-section sp-expired"><div className="sp-section-heading"><h2><LineIcon name="calendar"/>Plazo terminado <span>{expired.length}</span></h2></div><div className="sp-grid">{expired.map(item=><ActivityCard item={item} state="expired" key={item.id}/>)}</div></section>}
         </section>
-        {scheduled.length > 0 && <section className="sp-section">
-          <h2>Actividades programadas <span>{scheduled.length}</span></h2>
-          <div className="sp-grid">{scheduled.map(item => <article className={`sp-card theme-${item.theme||"mint"}`} key={item.id}><div className="sp-cover">{item.imageUrl?<img src={item.imageUrl} alt={`Imagen de ${item.title}`} loading="lazy"/>:<span aria-hidden="true">✦</span>}</div><div className="sp-card-status sp-scheduled-status">Próximamente</div><h3>{item.title}</h3><p>{item.instructions||"Esta actividad todavía no está disponible."}</p><small>Se activa {item.availableFrom ? new Date(item.availableFrom).toLocaleString("es-MX") : "pronto"}</small></article>)}</div>
-        </section>}
-        {expired.length > 0 && <section className="sp-section sp-expired">
-          <h2>Plazo terminado <span>{expired.length}</span></h2>
-          <div className="sp-grid">{expired.map(item => (
-            <article className={`sp-card theme-${item.theme||"mint"}`} key={item.id}>
-              <div className="sp-cover">{item.imageUrl?<img src={item.imageUrl} alt={`Imagen de ${item.title}`} loading="lazy"/>:<span aria-hidden="true">✦</span>}</div>
-              <div className="sp-card-status">{item.completed ? "Cerrada · realizada" : "Cerrada · pendiente"}</div>
-              <h3>{item.title}</h3>
-              <p>{item.completed ? `Mejor calificación: ${Number(item.bestGrade).toFixed(1)} / 10 · ${item.attempts} intentos` : "No se registró una entrega antes del cierre."}</p>
-              <small>Terminó {item.dueAt ? new Date(item.dueAt).toLocaleString("es-MX") : ""}</small>
-            </article>
-          ))}</div>
-        </section>}
-      </section>
+      </div>
     </main>
   );
 }

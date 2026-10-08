@@ -1,0 +1,3 @@
+interface Window {
+  GAS_WEB_APP_URL?: string;
+}

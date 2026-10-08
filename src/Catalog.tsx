@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { templateRegistry } from "./template-registry";
 import { apiRequest, getTeacherKey, getTeacherUsername, logoutTeacher } from "./gas-client";
+import TemplateIcon from "./TemplateIcon";
 
 export default function Catalog() {
   const [search, setSearch] = useState("");
@@ -54,11 +55,11 @@ export default function Catalog() {
           const href = game.id === "diagram-labels" ? "./?modo=maestro&nueva=1" : "./?juego=" + (game.id === "pairs" ? "parejas" : game.id) + "&modo=maestro&nueva=1";
           return ready
             ? <a className="catalog-card" key={game.id} href={href}>
-                <div className="catalog-visual" aria-hidden="true">{game.id === "diagram-labels" ? <div className="diagram-icon"><b/><b/><b/></div> : <div className="pairs-icon"><i>A</i><i>1</i><i>●</i><i>↔</i></div>}</div>
+                <div className={`catalog-visual icon-${game.id}`}><TemplateIcon id={game.id}/></div>
                 <div className="catalog-card-content"><span className="catalog-card-kicker">{game.kind}</span><h2>{game.title}</h2><p>{game.description}</p><strong>Crear actividad <span aria-hidden="true">→</span></strong></div>
               </a>
             : <article className="catalog-card catalog-soon" key={game.id} aria-label={game.title + ", en preparación"}>
-                <div className="catalog-visual" aria-hidden="true"><div className="pairs-icon"><i>···</i><i>?</i><i>✦</i><i>↔</i></div></div>
+                <div className={`catalog-visual icon-${game.id}`}><TemplateIcon id={game.id}/></div>
                 <div className="catalog-card-content"><span className="catalog-card-kicker">EN PREPARACIÓN</span><h2>{game.title}</h2><p>{game.description}</p><strong>Próximamente</strong></div>
               </article>;
         })}{!matches.length && <p className="catalog-empty">No encontré un juego con ese nombre.</p>}</div>

@@ -3,6 +3,7 @@ import type { Activity } from "./default-activity";
 import { templateRegistry } from "./template-registry";
 import { apiRequest, forgetTeacherKey, getTeacherKey, getTeacherUsername, logoutTeacher, rememberTeacherKey } from "./gas-client";
 import { activityCover, activityTheme } from "./activity-visual";
+import TemplateIcon from "./TemplateIcon";
 import "./activity-manager.css";
 
 function editorUrl(activity?: Activity, templateId = "diagram-labels", duplicate = false) {
@@ -305,7 +306,7 @@ export default function ActivityManager() {
       </section> : section === "create" ? <>
       <div className="am-heading"><div><span className="am-kicker">NUEVA ACTIVIDAD</span><h1>Elige una plantilla</h1><p>Al elegir un tipo de juego, se abrirá directamente su editor.</p></div><a className="am-back-link" href="?panel=actividades">← Mis actividades</a></div>
       {notice&&<p className="am-notice" role="status">{notice}</p>}
-            <section className="am-create" id="crear"><div><h2>Crear actividad</h2><p>Al elegir una plantilla disponible, se abre su editor directamente.</p></div><div className="am-template-grid">{available.map(template=><a key={template.id} className="am-template-card" href={editorUrl(undefined,template.id)}><span>{template.id==="pairs"?"↔":"◎"}</span><b>{template.title}</b><small>{template.description}</small><strong>Crear actividad →</strong></a>)}</div>
+            <section className="am-create" id="crear"><div><h2>Crear actividad</h2><p>Al elegir una plantilla disponible, se abre su editor directamente.</p></div><div className="am-template-grid">{available.map(template=><a key={template.id} className="am-template-card" href={editorUrl(undefined,template.id)}><span className="am-template-symbol"><TemplateIcon id={template.id}/></span><b>{template.title}</b><small>{template.description}</small><strong>Crear actividad <span aria-hidden="true">→</span></strong></a>)}</div>
       <details className="am-planned"><summary>Plantillas en preparación ({planned.length + templateRegistry.filter(template => template.status === "ready" && !supportedKinds.includes(template.id === "diagram-labels" ? "diagram" : template.id)).length})</summary><div>{[...planned,...templateRegistry.filter(template => template.status === "ready" && !supportedKinds.includes(template.id === "diagram-labels" ? "diagram" : template.id))].map(template=><span key={template.id}>{template.title}</span>)}</div></details></section>
       </> : <>
       <div className="am-heading"><div><span className="am-kicker">TU ESPACIO DE TRABAJO</span><h1>Mis actividades</h1><p>Abre, edita y comparte las actividades que has creado.</p></div><div className="am-heading-actions"><button className="am-refresh" onClick={()=>void refresh()} disabled={busy}>Actualizar lista</button><a className="am-primary" href="?panel=actividades&seccion=crear">＋ Crear actividad</a></div></div>

@@ -9,14 +9,23 @@ const STUDENT_SESSION_KEY = "aulaStudentSessionV1";
 export type StudentSessionProfile = { id:string; name?:string; givenNames:string; paternalSurname:string; maternalSurname:string; username:string };
 
 export function getStudentSession() {
-  try { return JSON.parse(sessionStorage.getItem(STUDENT_SESSION_KEY) || "null") as { token: string; student: StudentSessionProfile } | null; }
+  try {
+    let stored = "";
+    try { stored = localStorage.getItem(STUDENT_SESSION_KEY) || ""; } catch { /* Sigue con la sesión de esta pestaña. */ }
+    if (!stored) stored = sessionStorage.getItem(STUDENT_SESSION_KEY) || "";
+    const parsed = JSON.parse(stored) as { token: string; student: StudentSessionProfile } | null;
+    if (parsed?.token) try { localStorage.setItem(STUDENT_SESSION_KEY, stored); } catch { /* Mantén la sesión actual si el navegador bloquea el almacenamiento persistente. */ }
+    return parsed;
+  }
   catch { return null; }
 }
 export function saveStudentSession(token: string, student: StudentSessionProfile) {
   const normalized = { ...student, givenNames: student.givenNames || student.name || "" };
-  sessionStorage.setItem(STUDENT_SESSION_KEY, JSON.stringify({ token, student: normalized }));
+  const value = JSON.stringify({ token, student: normalized });
+  try { localStorage.setItem(STUDENT_SESSION_KEY, value); } catch { /* La sesión de pestaña sigue disponible. */ }
+  try { sessionStorage.setItem(STUDENT_SESSION_KEY, value); } catch { /* El inicio permanece válido aunque la pestaña bloquee almacenamiento. */ }
 }
-export function clearStudentSession() { sessionStorage.removeItem(STUDENT_SESSION_KEY); }
+export function clearStudentSession() { try { localStorage.removeItem(STUDENT_SESSION_KEY); } catch {} try { sessionStorage.removeItem(STUDENT_SESSION_KEY); } catch {} }
 
 export function getTeacherKey() {
   for (const name of teacherKeyNames) {

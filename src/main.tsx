@@ -10,6 +10,7 @@ import ExtraGame from "./ExtraGame";
 import StudentPortal from "./StudentPortal";
 import HomeGate from "./HomeGate";
 import "./globals.css";
+import "./redesign.css";
 
 const query=new URLSearchParams(window.location.search);
 const game=query.get("juego")||"";
