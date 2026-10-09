@@ -2,7 +2,7 @@ import type { Activity as LegacyActivity, MatchingPair } from "./default-activit
 
 export type TemplateId =
   | "diagram-labels" | "pairs" | "quiz" | "quiz-show" | "true-false" | "group-sort" | "sequence"
-  | "complete-sentence" | "complete-phrase" | "word-order" | "flashcards" | "roulette" | "memory" | "word-search";
+  | "complete-sentence" | "complete-phrase" | "word-order" | "flashcards" | "roulette" | "memory" | "word-search" | "crossword";
 
 export type TimerMode = "none" | "up" | "down";
 export type SharedSettings = {
@@ -40,10 +40,11 @@ export type WordOrderContent = { type: "word-order"; sentences: Array<{ id: stri
 export type CardsContent = { type: "cards"; cards: Array<{ id: string; front: { text: string; imageUrl?: string | null }; back: { text: string; imageUrl?: string | null } }> };
 export type WheelContent = { type: "wheel"; entries: Array<{ id: string; text: string; imageUrl?: string | null }> };
 export type WordSearchContent = { type: "word-search"; words: string[]; gridSize: number; directions: Array<"horizontal" | "vertical" | "diagonal"> };
+export type CrosswordContent = { type: "crossword"; clues: Array<{ id: string; clue: string; answer: string; direction: "across" | "down" }> };
 
 export type ActivityContent =
   | DiagramContent | RelationContent | QuizContent | GroupContent | SequenceContent
-  | SentenceContent | WordOrderContent | CardsContent | WheelContent | WordSearchContent;
+  | SentenceContent | WordOrderContent | CardsContent | WheelContent | WordSearchContent | CrosswordContent;
 
 export type CommonActivity = {
   schemaVersion: 2;
@@ -93,5 +94,5 @@ export function convertRelationTemplate(activity: CommonActivity, target: Templa
 }
 
 export function isTemplateImplemented(id: TemplateId): boolean {
-  return ["diagram-labels", "pairs", "quiz", "quiz-show", "true-false", "group-sort", "sequence", "complete-sentence", "complete-phrase", "word-order", "flashcards", "memory", "roulette", "word-search"].includes(id);
+  return ["diagram-labels", "pairs", "quiz", "quiz-show", "true-false", "group-sort", "sequence", "complete-sentence", "complete-phrase", "word-order", "flashcards", "memory", "roulette", "word-search", "crossword"].includes(id);
 }

@@ -2,7 +2,7 @@ const TAB_ACTIVITIES = 'Actividades';
 const TAB_RESULTS = 'Resultados';
 const TAB_STUDENTS = 'Alumnos';
 const TAB_DEADLINES = 'Fechas límite';
-const STUDENT_HEADERS = ['ID', 'Apellido paterno', 'Apellido materno', 'Nombre(s)', 'Usuario', 'Sal', 'Hash de contraseña', 'Activo', 'Creada', 'Versión de contraseña'];
+const STUDENT_HEADERS = ['ID', 'Apellido paterno', 'Apellido materno', 'Nombre(s)', 'Usuario', 'Sal', 'Hash de contraseña', 'Activo', 'Creada', 'Versión de contraseña', 'Contraseña cifrada'];
 const RESULT_HEADERS = ['ID', 'Actividad ID', 'Apellido paterno', 'Apellido materno', 'Nombre(s)', 'Aciertos', 'Total', 'Calificación', 'Tiempo realizado (s)', 'Tiempo restante (s)', 'Tiempo agotado', 'Respuestas JSON', 'Fecha', 'Alumno ID'];
 
 function setupMigration() {
@@ -44,6 +44,13 @@ function setupMigration() {
   Logger.log('Después, implementa el proyecto como Aplicación web y copia la URL /exec en config.js.');
 }
 
+// Run once from the Apps Script editor after adding the Gemini key, so the
+// project owner grants UrlFetchApp's external-request permission in advance.
+function authorizeGeminiAccess() {
+  const response = UrlFetchApp.fetch('https://generativelanguage.googleapis.com', { muteHttpExceptions: true });
+  Logger.log('Permiso para solicitudes externas concedido. Respuesta del servicio: ' + response.getResponseCode());
+}
+
 function doGet(e) {
   const p = e && e.parameter ? e.parameter : {};
   const callback = String(p.callback || '');
@@ -68,10 +75,13 @@ function doPost(e) {
     else if (body.action === 'teacherLogin') result = teacherLogin_(body);
     else if (body.action === 'teacherLogout') result = teacherLogout_(body);
     else if (body.action === 'resetStudentPassword') result = resetStudentPassword_(body);
+    else if (body.action === 'manageStudents') result = manageStudents_(body);
     else if (body.action === 'setStudentActive') result = setStudentActive_(body);
     else if (body.action === 'deleteStudent') result = deleteStudent_(body);
     else if (body.action === 'setActivityDeadline') result = setActivityDeadline_(body);
     else if (body.action === 'setActivityDesign') result = setActivityDesign_(body);
+    else if (body.action === 'setActivityStudents') result = setActivityStudents_(body);
+    else if (body.action === 'generateActivityContent') result = generateActivityContent_(body);
     else result = { error: 'Operación no reconocida.' };
     return output_(result, 'json');
   } catch (err) {
@@ -88,7 +98,8 @@ function routeGet_(p) {
   if (action === 'attempts') return attemptInfo_(String(p.activityId || 'digestivo-inicial'), p.paternalSurname, p.maternalSurname, p.givenNames, p.studentToken);
   if (action === 'leaderboard') return leaderboard_(String(p.activityId || 'digestivo-inicial'));
   if (action === 'studentPortal') return studentPortal_(String(p.studentToken || ''));
-  if (action === 'capabilities') return { apiVersion: 4, kinds: ['diagram', 'pairs', 'quiz', 'quiz-show', 'true-false', 'group-sort', 'sequence', 'flashcards', 'memory', 'complete-sentence', 'complete-phrase', 'word-order', 'roulette', 'word-search'] };
+  if (action === 'capabilities') return { apiVersion: 5, kinds: ['diagram', 'pairs', 'quiz', 'quiz-show', 'true-false', 'group-sort', 'sequence', 'flashcards', 'memory', 'complete-sentence', 'complete-phrase', 'word-order', 'roulette', 'word-search', 'crossword'] };
+  if (action === 'aiResult') return aiGenerationResult_(String(p.requestId || ''));
   if (!authorized_(p.key)) return { error: 'Clave del maestro incorrecta.' };
   if (action === 'activities') return listActivities_();
   if (action === 'results') return listResults_();
@@ -103,7 +114,7 @@ function saveActivity_(body) {
   const title = String(body.title || '').trim().slice(0, 120);
   if (!title) throw new Error('Escribe el título de la actividad.');
   if (body.kind === 'pairs') return savePairActivity_(body, id, title);
-  if (['quiz', 'quiz-show', 'true-false', 'group-sort', 'sequence', 'complete-sentence', 'complete-phrase', 'word-order', 'roulette', 'word-search'].includes(body.kind)) return saveTemplateActivity_(body, id, title);
+  if (['quiz', 'quiz-show', 'true-false', 'group-sort', 'sequence', 'complete-sentence', 'complete-phrase', 'word-order', 'roulette', 'word-search', 'crossword'].includes(body.kind)) return saveTemplateActivity_(body, id, title);
   if (!Array.isArray(body.labels) || body.labels.length < 1 || body.labels.length > 10) throw new Error('La actividad requiere de 1 a 10 etiquetas.');
 
   const sheet = spreadsheet_().getSheetByName(TAB_ACTIVITIES);
@@ -138,7 +149,8 @@ function saveActivity_(body) {
     imageUrl: imageUrl,
     coverImageUrl: String(body.coverImageUrl || (old && old.config.coverImageUrl) || ''),
     cardTheme: ['mint', 'sky', 'lilac', 'peach'].indexOf(String(body.cardTheme || (old && old.config.cardTheme) || 'mint')) >= 0 ? String(body.cardTheme || (old && old.config.cardTheme) || 'mint') : 'mint',
-    labels: labels
+    labels: labels,
+    assignedStudentIds: Array.isArray(body.assignedStudentIds) ? body.assignedStudentIds.map(String) : old ? old.config.assignedStudentIds : []
   };
   const now = new Date();
   const row = [id, title, JSON.stringify(activity), imageUrl, now];
@@ -172,6 +184,17 @@ function saveTemplateActivity_(body, id, title) {
     const size = clamp_(body.wordSearchGridSize || 10, 10, 15), seenWords = {};
     content.wordSearchWords = body.wordSearchWords.map(function(word) { const text = String(word || '').trim().slice(0, 30), normalized = normalizeWord_(text); if (!normalized || normalized.length > size) throw new Error('Cada palabra debe caber en la cuadrícula de ' + size + ' letras.'); if (seenWords[normalized]) throw new Error('No repitas palabras en la sopa de letras.'); seenWords[normalized] = true; return text; });
     content.wordSearchGridSize = size; content.wordSearchDirections = ['horizontal', 'vertical', 'diagonal'];
+    content.wordSearchShowClues = body.wordSearchShowClues === true;
+    content.wordSearchClues = {};
+    content.wordSearchWords.forEach(function(word) { const clue = String((body.wordSearchClues || {})[word] || '').trim().slice(0, 160); if (content.wordSearchShowClues && !clue) throw new Error('Escribe una pista para cada palabra o elige “Mostrar palabras”.'); if (clue) content.wordSearchClues[word] = clue; });
+  } else if (kind === 'crossword') {
+    if (!Array.isArray(body.crosswordClues) || body.crosswordClues.length < 3 || body.crosswordClues.length > 25) throw new Error('Agrega entre 3 y 25 pistas para el crucigrama.');
+    content.crosswordClues = body.crosswordClues.map(function(item, i) {
+      const clueId = unique_(item.id, 'pista-' + (i + 1));
+      const clue = String(item.clue || '').trim().slice(0, 240), answer = String(item.answer || '').trim().slice(0, 24);
+      if (!clue || normalizeWord_(answer).length < 2) throw new Error('Cada pista necesita una pregunta y una respuesta de al menos 2 letras.');
+      return { id: clueId, clue: clue, answer: answer, direction: item.direction === 'down' ? 'down' : 'across' };
+    });
   } else if (kind === 'quiz' || kind === 'quiz-show' || kind === 'true-false') {
     if (!Array.isArray(body.questions) || body.questions.length < 1 || body.questions.length > 50) throw new Error('Agrega entre 1 y 50 preguntas.');
     content.questions = body.questions.map(function(question, qi) {
@@ -261,7 +284,8 @@ function saveTemplateActivity_(body, id, title) {
     maxAttempts: body.maxAttempts === null ? null : clamp_(body.maxAttempts || 3, 1, 35),
     shuffle: body.shuffle !== false, sound: body.sound !== false, scoring: true,
     imageUrl: '', coverImageUrl: String(body.coverImageUrl || (old && old.config.coverImageUrl) || ''),
-    cardTheme: ['mint', 'sky', 'lilac', 'peach'].indexOf(String(body.cardTheme || (old && old.config.cardTheme) || 'mint')) >= 0 ? String(body.cardTheme || (old && old.config.cardTheme) || 'mint') : 'mint', labels: []
+    cardTheme: ['mint', 'sky', 'lilac', 'peach'].indexOf(String(body.cardTheme || (old && old.config.cardTheme) || 'mint')) >= 0 ? String(body.cardTheme || (old && old.config.cardTheme) || 'mint') : 'mint', labels: [],
+    assignedStudentIds: Array.isArray(body.assignedStudentIds) ? body.assignedStudentIds.map(String) : (old && old.config.assignedStudentIds) || []
   };
   Object.keys(content).forEach(function(key) { activity[key] = content[key]; });
   const row = [id, title, JSON.stringify(activity), '', new Date()];
@@ -293,7 +317,8 @@ function savePairActivity_(body, id, title) {
     timerMode: mode, timeLimitSeconds: clamp_(body.timeLimitSeconds || 180, 15, 3600),
     maxAttempts: body.maxAttempts === null ? null : clamp_(body.maxAttempts || 3, 1, 35),
     imageUrl: '', coverImageUrl: String(body.coverImageUrl || (old && old.config.coverImageUrl) || ''),
-    cardTheme: ['mint', 'sky', 'lilac', 'peach'].indexOf(String(body.cardTheme || (old && old.config.cardTheme) || 'mint')) >= 0 ? String(body.cardTheme || (old && old.config.cardTheme) || 'mint') : 'mint', labels: [], pairs: pairs
+    cardTheme: ['mint', 'sky', 'lilac', 'peach'].indexOf(String(body.cardTheme || (old && old.config.cardTheme) || 'mint')) >= 0 ? String(body.cardTheme || (old && old.config.cardTheme) || 'mint') : 'mint', labels: [], pairs: pairs,
+    assignedStudentIds: Array.isArray(body.assignedStudentIds) ? body.assignedStudentIds.map(String) : old ? old.config.assignedStudentIds : []
   };
   const sheet = spreadsheet_().getSheetByName(TAB_ACTIVITIES), now = new Date();
   const row = [id, title, JSON.stringify(activity), '', now];
@@ -317,6 +342,7 @@ function saveResult_(body) {
   if (unavailable) throw new Error(unavailable);
   const account = body.studentToken ? verifyStudentToken_(String(body.studentToken)) : null;
   if (body.studentToken && !account) throw new Error('Tu sesión venció. Vuelve a entrar con tu usuario y contraseña.');
+  if (Array.isArray(activity.assignedStudentIds) && (!account || activity.assignedStudentIds.indexOf(String(account.id)) < 0)) throw new Error('Esta actividad no está asignada a tu cuenta.');
   const paternal = account ? account.paternalSurname : clean_(body.paternalSurname, 70);
   const maternal = account ? account.maternalSurname : clean_(body.maternalSurname, 70);
   const names = account ? account.givenNames : clean_(body.givenNames, 100);
@@ -367,6 +393,12 @@ function saveResult_(body) {
       const selected = String(answers[pair.id] || '');
       if (selected === pair.id) { safe[pair.id] = pair.id; correct++; }
     });
+  } else if (activity.kind === 'crossword') {
+    (activity.crosswordClues || []).forEach(function(item) {
+      const submitted = String(answers[item.id] || '').slice(0, 40);
+      safe[item.id] = submitted;
+      if (normalizeWord_(submitted) === normalizeWord_(item.answer)) correct++;
+    });
   } else if (activity.kind === 'pairs') {
     (activity.pairs || []).forEach(function(pair) {
       const target = String(matches[pair.id] || '').slice(0, 100);
@@ -378,7 +410,7 @@ function saveResult_(body) {
     if (activity.labels.some(function(other) { return other.id === target; })) safe[label.id] = target;
     if (target === label.id) correct++;
   });
-  const total = activity.kind === 'pairs' || activity.kind === 'flashcards' || activity.kind === 'memory' ? (activity.pairs || []).length : activity.kind === 'quiz' || activity.kind === 'quiz-show' || activity.kind === 'true-false' ? (activity.questions || []).length : activity.kind === 'group-sort' ? (activity.items || []).length : activity.kind === 'sequence' ? (activity.steps || []).length : activity.kind === 'complete-sentence' || activity.kind === 'complete-phrase' ? (activity.sentences || []).length : activity.kind === 'word-order' ? (activity.wordSentences || []).reduce(function(sum, sentence) { return sum + (sentence.words || []).length; }, 0) : activity.kind === 'roulette' ? (activity.wheelEntries || []).length : activity.kind === 'word-search' ? (activity.wordSearchWords || []).length : activity.labels.length;
+  const total = activity.kind === 'pairs' || activity.kind === 'flashcards' || activity.kind === 'memory' ? (activity.pairs || []).length : activity.kind === 'quiz' || activity.kind === 'quiz-show' || activity.kind === 'true-false' ? (activity.questions || []).length : activity.kind === 'group-sort' ? (activity.items || []).length : activity.kind === 'sequence' ? (activity.steps || []).length : activity.kind === 'complete-sentence' || activity.kind === 'complete-phrase' ? (activity.sentences || []).length : activity.kind === 'word-order' ? (activity.wordSentences || []).reduce(function(sum, sentence) { return sum + (sentence.words || []).length; }, 0) : activity.kind === 'roulette' ? (activity.wheelEntries || []).length : activity.kind === 'word-search' ? (activity.wordSearchWords || []).length : activity.kind === 'crossword' ? (activity.crosswordClues || []).length : activity.labels.length;
   const grade = Math.round((correct / Math.max(total, 1)) * 100) / 10;
   const elapsed = clamp_(body.elapsedSeconds || 0, 0, 86400);
   const remaining = body.remainingSeconds === null || body.remainingSeconds === undefined ? '' : clamp_(body.remainingSeconds, 0, 86400);
@@ -409,6 +441,7 @@ function attemptInfo_(activityId, paternalValue, maternalValue, namesValue, stud
   if (!paternal || !maternal || !names) return { error: 'Escribe los dos apellidos y tu nombre.' };
   const activity = getActivity_(activityId);
   if (activity.error) return { error: 'No se encontró la actividad.' };
+  if (Array.isArray(activity.assignedStudentIds) && (!account || activity.assignedStudentIds.indexOf(String(account.id)) < 0)) return { error: 'Esta actividad no está asignada a tu cuenta.' };
   const unavailable = activityAvailabilityError_(activity);
   if (unavailable) return { error: unavailable };
   const sheet = spreadsheet_().getSheetByName(TAB_RESULTS);
@@ -450,7 +483,7 @@ function studentPortal_(token) {
   const attempts = listResults_().filter(function(row) {
     return row.student_id === account.id || (!row.student_id && normalizeStudent_(row.paternal_surname) === normalizeStudent_(account.paternalSurname) && normalizeStudent_(row.maternal_surname) === normalizeStudent_(account.maternalSurname) && normalizeStudent_(row.given_names) === normalizeStudent_(account.givenNames));
   });
-  const activities = listActivities_().map(function(activity) {
+  const activities = listActivities_().filter(function(activity) { return !Array.isArray(activity.assignedStudentIds) || activity.assignedStudentIds.indexOf(String(account.id)) >= 0; }).map(function(activity) {
     const startAt = activity.availableFrom || '';
     const dueAt = activity.availableUntil || '';
     const rows = attempts.filter(function(row) { return row.activity_id === activity.id; });
@@ -532,6 +565,77 @@ function setActivityDeadline_(body) {
   if (index >= 0) sheet.getRange(index + 2, 1, 1, 4).setValues([[id, fromValue, untilValue, new Date()]]);
   else sheet.appendRow([id, fromValue, untilValue, new Date()]);
   return { ok: true, availableFrom: fromValue || null, availableUntil: untilValue || null };
+}
+
+function setActivityStudents_(body) {
+  if (!authorized_(body.key)) throw new Error('Clave del maestro incorrecta.');
+  const id = String(body.id || '').slice(0, 100), row = findActivityRow_(spreadsheet_().getSheetByName(TAB_ACTIVITIES), id);
+  if (!row) throw new Error('No se encontró la actividad.');
+  if (!Array.isArray(body.studentIds)) throw new Error('Selecciona al menos un alumno o elige a todos.');
+  const active = listStudents_().filter(function(student) { return student.active; }).map(function(student) { return String(student.id); });
+  const requested = Array.from(new Set(body.studentIds.map(String)));
+  if (requested.some(function(studentId) { return active.indexOf(studentId) < 0; })) throw new Error('La lista contiene una cuenta inactiva o inexistente. Actualiza la lista de alumnos.');
+  const activity = row.config;
+  activity.assignedStudentIds = requested;
+  spreadsheet_().getSheetByName(TAB_ACTIVITIES).getRange(row.row, 3).setValue(JSON.stringify(activity));
+  spreadsheet_().getSheetByName(TAB_ACTIVITIES).getRange(row.row, 5).setValue(new Date());
+  return { id: id, assignedStudentIds: requested };
+}
+
+function generateActivityContent_(body) {
+  const requestId = String(body.requestId || '').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 100);
+  try { return generateActivityContentImpl_(body); }
+  catch (err) {
+    if (requestId) CacheService.getScriptCache().put('ai:' + requestId, JSON.stringify({ error: String(err && err.message || 'No se pudo generar el contenido.') }), 300);
+    return { ok: true };
+  }
+}
+
+function generateActivityContentImpl_(body) {
+  if (!authorized_(body.key)) throw new Error('Inicia sesión como maestro para usar el generador.');
+  const requestId = String(body.requestId || '').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 100);
+  if (!requestId) throw new Error('Falta el identificador de solicitud.');
+  const props = PropertiesService.getScriptProperties(), apiKey = props.getProperty('GEMINI_API_KEY');
+  if (!apiKey) throw new Error('Falta configurar GEMINI_API_KEY en las propiedades del proyecto de Apps Script.');
+  const kind = String(body.kind || ''), title = String(body.title || '').slice(0, 120), topic = String(body.topic || '').trim().slice(0, 500);
+  if (!topic) throw new Error('Escribe el tema para preparar el contenido.');
+  const count = Math.max(3, Math.min(15, Number(body.count) || 6));
+  const schema = {
+    'diagram': '{"labels":[{"text":"etiqueta corta"}]}',
+    'pairs': '{"pairs":[{"leftText":"concepto","rightText":"pareja"}]}',
+    'memory': '{"pairs":[{"leftText":"concepto","rightText":"pareja"}]}',
+    'flashcards': '{"pairs":[{"leftText":"frente","rightText":"reverso"}]}',
+    'quiz': '{"questions":[{"prompt":"pregunta","options":["A","B","C","D"],"correctIndex":0}]}',
+    'quiz-show': '{"questions":[{"prompt":"pregunta","options":["A","B","C","D"],"correctIndex":0}]}',
+    'true-false': '{"questions":[{"prompt":"afirmación","correct":true}]}',
+    'group-sort': '{"groups":["grupo A","grupo B"],"items":[{"text":"elemento","groupIndex":0}]}',
+    'sequence': '{"steps":[{"text":"paso en orden correcto"}]}',
+    'complete-sentence': '{"sentences":[{"before":"texto antes del espacio","answer":"respuesta","after":"texto después"}]}',
+    'complete-phrase': '{"sentences":[{"before":"texto antes","answer":"palabra a completar","after":"texto después"}]}',
+    'word-order': '{"wordSentences":[{"text":"oración correcta"}]}',
+    'roulette': '{"wheelEntries":[{"text":"pregunta o reto breve"}]}',
+    'word-search': '{"wordSearchWords":["PALABRA"]}',
+    'crossword': '{"crosswordClues":[{"clue":"pista clara","answer":"respuesta","direction":"across"}]}'
+  };
+  if (!schema[kind]) throw new Error('La IA no está configurada para esta plantilla.');
+  const prompt = 'Crea contenido educativo en español para primaria, grado/edad: ' + String(body.grade || '4.º de primaria').slice(0, 50) + '. Tema: ' + topic + '. Título: ' + title + '. Genera exactamente ' + count + ' elementos útiles, correctos y apropiados. Devuelve solo JSON válido con este esquema y sus campos: ' + schema[kind] + '. No incluyas Markdown. No generes imágenes, direcciones web ni HTML. En opción múltiple agrega 4 opciones y correctIndex como índice 0 a 3. En verdadero/falso incluye correct true o false. Para clasificar, crea 2 a 4 grupos y asigna groupIndex. En sopa de letras usa palabras de máximo 12 letras, sin espacios. Para el diagrama da solo etiquetas cortas.';
+  const model = props.getProperty('GEMINI_MODEL') || 'gemini-3.5-flash';
+  const url = 'https://generativelanguage.googleapis.com/v1beta/models/' + encodeURIComponent(model) + ':generateContent?key=' + encodeURIComponent(apiKey);
+  const response = UrlFetchApp.fetch(url, { method: 'post', contentType: 'application/json', muteHttpExceptions: true, payload: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { responseMimeType: 'application/json', temperature: 0.65 } }) });
+  const status = response.getResponseCode(), raw = response.getContentText();
+  if (status < 200 || status >= 300) throw new Error('Gemini no pudo generar el contenido (HTTP ' + status + '). Revisa la clave y el límite de uso de Google AI Studio.');
+  const envelope = JSON.parse(raw), text = envelope.candidates && envelope.candidates[0] && envelope.candidates[0].content && envelope.candidates[0].content.parts && envelope.candidates[0].content.parts.map(function(part) { return part.text || ''; }).join('');
+  if (!text) throw new Error('La IA no devolvió contenido. Intenta con otro tema.');
+  let content;
+  try { content = JSON.parse(text.replace(/^```json\s*|\s*```$/g, '')); } catch (_) { throw new Error('La IA devolvió un formato que no se pudo leer. Intenta de nuevo.'); }
+  CacheService.getScriptCache().put('ai:' + requestId, JSON.stringify({ content: content }), 300);
+  return { ok: true };
+}
+
+function aiGenerationResult_(requestId) {
+  if (!requestId) return { error: 'Falta el identificador de solicitud.' };
+  const value = CacheService.getScriptCache().get('ai:' + requestId);
+  return value ? JSON.parse(value) : { pending: true };
 }
 
 function activityAvailabilityError_(activity) {
@@ -801,7 +905,7 @@ function saveStudents_(body) {
     names.add(key); usernames.add(username);
     const id = String(item.id || Utilities.getUuid());
     const salt = Utilities.getUuid().replace(/-/g, '');
-    rows.push([id, paternal, maternal, given, username, salt, passwordHash_(salt, password), true, new Date(), Utilities.getUuid()]);
+    rows.push([id, paternal, maternal, given, username, salt, passwordHash_(salt, password), true, new Date(), Utilities.getUuid(), encryptStudentPassword_(password)]);
   });
   const lock = LockService.getScriptLock(); lock.waitLock(30000);
   try { rows.forEach(function(row) { sheet.appendRow(row); }); SpreadsheetApp.flush(); }
@@ -810,14 +914,15 @@ function saveStudents_(body) {
 }
 
 function listStudents_() {
-  return getStudentRows_().map(function(s) { return { id: s.id, paternal_surname: s.paternalSurname, maternal_surname: s.maternalSurname, given_names: s.givenNames, username: s.username, active: s.active, password_version: s.passwordVersion }; });
+  return getStudentRows_().map(function(s) { return { id: s.id, paternal_surname: s.paternalSurname, maternal_surname: s.maternalSurname, given_names: s.givenNames, username: s.username, active: s.active, password_version: s.passwordVersion, password: s.encryptedPassword ? decryptStudentPassword_(s.encryptedPassword) : '' }; });
 }
 
 function getStudentRows_() {
   const sheet = spreadsheet_().getSheetByName(TAB_STUDENTS);
+  if (String(sheet.getRange(1, STUDENT_HEADERS.length).getValue()) !== STUDENT_HEADERS[STUDENT_HEADERS.length - 1]) sheet.getRange(1, STUDENT_HEADERS.length).setValue(STUDENT_HEADERS[STUDENT_HEADERS.length - 1]).setFontWeight('bold').setBackground('#eaf4fb');
   if (sheet.getLastRow() < 2) return [];
   return sheet.getRange(2, 1, sheet.getLastRow() - 1, STUDENT_HEADERS.length).getValues().map(function(r) {
-    return { id: String(r[0]), paternalSurname: String(r[1]), maternalSurname: String(r[2]), givenNames: String(r[3]), username: String(r[4]), salt: String(r[5]), hash: String(r[6]), active: r[7] !== false && String(r[7]).toLowerCase() !== 'false', passwordVersion: String(r[9] || '') };
+    return { id: String(r[0]), paternalSurname: String(r[1]), maternalSurname: String(r[2]), givenNames: String(r[3]), username: String(r[4]), salt: String(r[5]), hash: String(r[6]), active: r[7] !== false && String(r[7]).toLowerCase() !== 'false', passwordVersion: String(r[9] || ''), encryptedPassword: String(r[10] || '') };
   });
 }
 
@@ -864,8 +969,78 @@ function resetStudentPassword_(body) {
   const row = index + 2, salt = Utilities.getUuid().replace(/-/g, '');
   sheet.getRange(row, 6, 1, 2).setValues([[salt, passwordHash_(salt, password)]]);
   sheet.getRange(row, 10).setValue(Utilities.getUuid());
+  sheet.getRange(row, 11).setValue(encryptStudentPassword_(password));
   SpreadsheetApp.flush();
   return { reset: true };
+}
+
+function manageStudents_(body) {
+  if (!authorized_(body.key)) throw new Error('Clave del maestro incorrecta.');
+  const ids = Array.from(new Set((Array.isArray(body.studentIds) ? body.studentIds : []).map(String).filter(Boolean)));
+  const action = String(body.operation || '');
+  if (!ids.length || ids.length > 35) throw new Error('Selecciona de 1 a 35 alumnos.');
+  const students = getStudentRows_(), matches = ids.map(function(id) { return students.find(function(s) { return s.id === id; }); });
+  if (matches.some(function(s) { return !s; })) throw new Error('No se encontraron todas las cuentas seleccionadas. Actualiza la lista e inténtalo de nuevo.');
+  const sheet = spreadsheet_().getSheetByName(TAB_STUDENTS);
+  if (action === 'reset') {
+    const passwords = Array.isArray(body.passwords) ? body.passwords : [];
+    if (passwords.length !== ids.length) throw new Error('No se recibieron todas las contraseñas nuevas.');
+    const byId = {};
+    passwords.forEach(function(item) { byId[String(item.studentId)] = String(item.password || ''); });
+    ids.forEach(function(id) {
+      const password = byId[id];
+      if (password.length < 6 || password.length > 32) throw new Error('La contraseña generada no cumple el formato requerido.');
+      const row = students.findIndex(function(s) { return s.id === id; }) + 2, salt = Utilities.getUuid().replace(/-/g, '');
+      sheet.getRange(row, 6, 1, 2).setValues([[salt, passwordHash_(salt, password)]]);
+      sheet.getRange(row, 10, 1, 2).setValues([[Utilities.getUuid(), encryptStudentPassword_(password)]]);
+    });
+  } else if (action === 'deactivate') {
+    ids.forEach(function(id) { const row = students.findIndex(function(s) { return s.id === id; }) + 2; sheet.getRange(row, 8).setValue(false); sheet.getRange(row, 10).setValue(Utilities.getUuid()); });
+  } else if (action === 'delete') {
+    const resultSheet = spreadsheet_().getSheetByName(TAB_RESULTS), selected = {};
+    ids.forEach(function(id) { selected[id] = true; });
+    if (resultSheet.getLastRow() > 1) {
+      const resultRows = resultSheet.getRange(2, 1, resultSheet.getLastRow() - 1, RESULT_HEADERS.length).getValues();
+      for (let i = resultRows.length - 1; i >= 0; i--) {
+        const row = resultRows[i], id = String(row[13] || '');
+        const student = matches.find(function(s) { return s.id === id; });
+        const legacyMatch = !id && student && normalizeStudent_(row[2]) === normalizeStudent_(student.paternalSurname) && normalizeStudent_(row[3]) === normalizeStudent_(student.maternalSurname) && normalizeStudent_(row[4]) === normalizeStudent_(student.givenNames);
+        if (selected[id] || legacyMatch) resultSheet.deleteRow(i + 2);
+      }
+    }
+    const positions = ids.map(function(id) { return students.findIndex(function(s) { return s.id === id; }) + 2; }).sort(function(a, b) { return b - a; });
+    positions.forEach(function(row) { sheet.deleteRow(row); });
+  } else throw new Error('Acción de alumnos desconocida.');
+  SpreadsheetApp.flush();
+  return { ok: true, updated: ids.length };
+}
+
+function encryptStudentPassword_(password) {
+  const props = PropertiesService.getScriptProperties();
+  let key = props.getProperty('STUDENT_PASSWORD_ENCRYPTION_KEY');
+  if (!key) { key = Utilities.getUuid() + Utilities.getUuid(); props.setProperty('STUDENT_PASSWORD_ENCRYPTION_KEY', key); }
+  const nonce = Utilities.getUuid(), bytes = Utilities.newBlob(String(password)).getBytes(), cipher = [];
+  for (let offset = 0; offset < bytes.length; offset += 32) {
+    const block = Math.floor(offset / 32), stream = Utilities.computeHmacSha256Signature(nonce + ':' + block, key, Utilities.Charset.UTF_8);
+    for (let j = 0; j < Math.min(32, bytes.length - offset); j++) cipher.push(((bytes[offset + j] & 255) ^ (stream[j] & 255)) > 127 ? (((bytes[offset + j] & 255) ^ (stream[j] & 255)) - 256) : ((bytes[offset + j] & 255) ^ (stream[j] & 255)));
+  }
+  const encoded = Utilities.base64EncodeWebSafe(cipher), tag = Utilities.base64EncodeWebSafe(Utilities.computeHmacSha256Signature('tag:' + nonce + ':' + encoded, key, Utilities.Charset.UTF_8));
+  return nonce + '.' + encoded + '.' + tag;
+}
+
+function decryptStudentPassword_(value) {
+  try {
+    const parts = String(value || '').split('.'), key = PropertiesService.getScriptProperties().getProperty('STUDENT_PASSWORD_ENCRYPTION_KEY');
+    if (parts.length !== 3 || !key) return '';
+    const expected = Utilities.base64EncodeWebSafe(Utilities.computeHmacSha256Signature('tag:' + parts[0] + ':' + parts[1], key, Utilities.Charset.UTF_8));
+    if (expected !== parts[2]) return '';
+    const cipher = Utilities.base64DecodeWebSafe(parts[1]), bytes = [];
+    for (let offset = 0; offset < cipher.length; offset += 32) {
+      const block = Math.floor(offset / 32), stream = Utilities.computeHmacSha256Signature(parts[0] + ':' + block, key, Utilities.Charset.UTF_8);
+      for (let j = 0; j < Math.min(32, cipher.length - offset); j++) { const byte = (cipher[offset + j] & 255) ^ (stream[j] & 255); bytes.push(byte > 127 ? byte - 256 : byte); }
+    }
+    return Utilities.newBlob(bytes).getDataAsString();
+  } catch (e) { return ''; }
 }
 
 function setStudentActive_(body) {

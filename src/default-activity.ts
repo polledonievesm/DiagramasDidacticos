@@ -9,7 +9,8 @@ export type SequenceStep = { id: string; text: string; imageUrl?: string | null;
 export type FillSentence = { id: string; before: string; answer: string; after: string; imageUrl?: string | null; imageData?: string | null };
 export type WordOrderSentence = { id: string; text: string; wordStyles?: Array<{ bold?: boolean; italic?: boolean; underline?: boolean }>; words?: Array<{ id: string; text: string; order: number; bold?: boolean; italic?: boolean; underline?: boolean }> };
 export type WheelEntry = { id: string; text: string; imageUrl?: string | null; imageData?: string | null };
-export type ActivityKind = "diagram" | "pairs" | "quiz" | "quiz-show" | "true-false" | "group-sort" | "sequence" | "flashcards" | "memory" | "complete-sentence" | "complete-phrase" | "word-order" | "roulette" | "word-search";
+export type CrosswordClue = { id: string; clue: string; answer: string; direction?: "across" | "down" };
+export type ActivityKind = "diagram" | "pairs" | "quiz" | "quiz-show" | "true-false" | "group-sort" | "sequence" | "flashcards" | "memory" | "complete-sentence" | "complete-phrase" | "word-order" | "roulette" | "word-search" | "crossword";
 export type FormativeField = "lenguajes" | "saberes" | "etica" | "humano";
 export type Activity = {
   kind?: ActivityKind;
@@ -22,9 +23,13 @@ export type Activity = {
   wordSentences?: WordOrderSentence[];
   wheelEntries?: WheelEntry[];
   wordSearchWords?: string[];
+  wordSearchShowClues?: boolean;
+  wordSearchClues?: Record<string, string>;
   wordSearchGridSize?: number;
   phraseGridSize?: number;
   wordSearchDirections?: string[];
+  crosswordClues?: CrosswordClue[];
+  assignedStudentIds?: string[];
   shuffle?: boolean;
   sound?: boolean;
   scoring?: boolean;

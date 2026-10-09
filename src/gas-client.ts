@@ -305,8 +305,9 @@ export async function apiRequest(path: string, init: RequestInit = {}) {
     else if (activity.kind === "pairs") correct = (activity.pairs || []).filter((pair) => matches[pair.id] === pair.id).length;
     else if (activity.kind === "roulette") { const ids = new Set(Array.isArray(answers.completedIds) ? (answers.completedIds as unknown[]).map(String) : []); correct = (activity.wheelEntries || []).filter((entry) => ids.has(entry.id)).length; }
     else if (activity.kind === "word-search") { const normalizeWord = (word: string) => word.toLocaleUpperCase("es-MX").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-ZÑ]/g, ""); const found = new Set(Array.isArray(answers.foundWords) ? (answers.foundWords as unknown[]).map((word) => normalizeWord(String(word))) : []); correct = (activity.wordSearchWords || []).filter((word) => found.has(normalizeWord(word))).length; }
+    else if (activity.kind === "crossword") { const normalizeWord = (word: unknown) => String(word || "").toLocaleUpperCase("es-MX").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-ZÑ]/g, ""); correct = (activity.crosswordClues || []).filter(item => normalizeWord(answers[item.id]) === normalizeWord(item.answer)).length; }
     else correct = activity.labels.filter((label) => placements[label.id] === label.id).length;
-    const total = activity.kind === "pairs" || activity.kind === "flashcards" || activity.kind === "memory" ? (activity.pairs || []).length : activity.kind === "quiz" || activity.kind === "quiz-show" || activity.kind === "true-false" ? (activity.questions || []).length : activity.kind === "group-sort" ? (activity.items || []).length : activity.kind === "sequence" ? (activity.steps || []).length : activity.kind === "complete-sentence" || activity.kind === "complete-phrase" ? (activity.sentences || []).length : activity.kind === "word-order" ? (activity.wordSentences || []).reduce((sum, sentence) => sum + (sentence.words || []).length, 0) : activity.kind === "roulette" ? (activity.wheelEntries || []).length : activity.kind === "word-search" ? (activity.wordSearchWords || []).length : activity.labels.length;
+    const total = activity.kind === "pairs" || activity.kind === "flashcards" || activity.kind === "memory" ? (activity.pairs || []).length : activity.kind === "quiz" || activity.kind === "quiz-show" || activity.kind === "true-false" ? (activity.questions || []).length : activity.kind === "group-sort" ? (activity.items || []).length : activity.kind === "sequence" ? (activity.steps || []).length : activity.kind === "complete-sentence" || activity.kind === "complete-phrase" ? (activity.sentences || []).length : activity.kind === "word-order" ? (activity.wordSentences || []).reduce((sum, sentence) => sum + (sentence.words || []).length, 0) : activity.kind === "roulette" ? (activity.wheelEntries || []).length : activity.kind === "word-search" ? (activity.wordSearchWords || []).length : activity.kind === "crossword" ? (activity.crosswordClues || []).length : activity.labels.length;
     const elapsedSeconds = Number(body.elapsedSeconds) || 0;
     const result = {
       id: Date.now(), correct, total,
@@ -333,6 +334,29 @@ export async function apiRequest(path: string, init: RequestInit = {}) {
     cachedActivity = activity;
     cachedActivities.set(activity.id, activity);
     return response(activity as unknown as ApiResult);
+  }
+  if (method === "POST" && url.pathname.endsWith("/api/teacher/activity-students")) {
+    const key = new Headers(init.headers).get("x-teacher-key") || "";
+    await send({ ...body, action: "setActivityStudents", key });
+    const data = await jsonp<Activity | ApiResult>({ action: "activity", id: String(body.id || "") });
+    if (!data || "error" in (data as object)) return response(data as ApiResult, 400);
+    const activity = data as Activity;
+    const wanted = Array.isArray(body.studentIds) ? body.studentIds.map(String).sort() : [];
+    const saved = (activity.assignedStudentIds || []).map(String).sort();
+    if (JSON.stringify(wanted) !== JSON.stringify(saved)) return response({ error: "No se pudo verificar la asignación a los alumnos." }, 503);
+    cachedActivities.set(activity.id, activity);
+    return response(activity as unknown as ApiResult);
+  }
+  if (method === "POST" && url.pathname.endsWith("/api/teacher/ai-generate")) {
+    const key = new Headers(init.headers).get("x-teacher-key") || "";
+    const requestId = crypto.randomUUID();
+    await send({ ...body, action: "generateActivityContent", requestId, key });
+    for (let i = 0; i < 90; i++) {
+      const data = await jsonp<ApiResult>({ action: "aiResult", requestId });
+      if (!data.pending) return response(data, "error" in data ? 400 : 200);
+      await new Promise((resolve) => window.setTimeout(resolve, 1000));
+    }
+    return response({ error: "La generación tardó más de lo esperado. Vuelve a intentarlo." }, 504);
   }
   if (method === "POST" && url.pathname.endsWith("/api/teacher/activity-archive")) {
     const key = new Headers(init.headers).get("x-teacher-key") || "";

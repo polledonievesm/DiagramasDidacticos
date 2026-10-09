@@ -87,3 +87,12 @@
 /* Keep the active create control readable on its green background. */
 .am-top-nav>.am-nav-create,.am-top-nav>.am-nav-create:hover,.am-top-nav>.am-nav-create.active{color:#fff;background:#267653;box-shadow:none}
 .am-top-nav>.am-nav-create:hover{background:#1f6245}
+
+.am-assignment{margin:14px 0;padding:12px 14px;border:1px solid #d9e2eb;border-radius:12px;background:#f8fbfd;color:#26364a}
+.am-assignment summary{cursor:pointer;font-weight:700;color:#2475a8}
+.am-assignment-tools{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:12px 0}
+.am-assignment-tools button,.am-assignment>button{border:1px solid #cbd9e5;border-radius:8px;padding:7px 10px;background:#fff;color:#29536f;cursor:pointer}
+.am-assignment-tools span{font-size:13px;color:#607286}
+.am-assignment-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:4px 12px;max-height:180px;overflow:auto;margin:10px 0;padding:8px;background:white;border:1px solid #e2e9ef;border-radius:8px}
+.am-assignment-list label{display:flex;align-items:center;gap:8px;padding:5px;font-size:14px}
+.am-assignment-list input{accent-color:#287ead}
