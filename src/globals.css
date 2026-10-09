@@ -185,3 +185,20 @@ a.catalog-card:hover{transform:translateY(-3px);border-color:#b8cec0;box-shadow:
  .pair-ready-row .pair-primary{min-width:130px}
 }
 @media(max-width:420px){.pair-editor-actions>button{padding:8px 5px;font-size:13px}.pair-template{font-size:14px}.pair-ready-row{align-items:flex-end}.pair-ready-row>span{font-size:13px}}
+.pair-content-row>.editor-row-actions{grid-column:4;grid-row:1}.pair-workspace-head{padding-bottom:0;margin-bottom:16px}.editor-workflow{width:100%}
+@media(max-width:760px){.pair-content-row{grid-template-columns:30px minmax(0,1fr) minmax(0,1fr);gap:5px}.pair-content-row>.editor-row-actions{grid-column:2/4;grid-row:2;justify-content:flex-end}.pair-table-head{grid-template-columns:30px 1fr 1fr}.pair-table-head button{grid-column:2/4}.pair-content-cell{min-height:48px;height:48px}.pair-content-cell input:not([type=file]){height:46px;min-height:46px;font-size:14px;padding:6px!important}}
+.pair-image-button{color:#df8429!important}.pair-image-button:hover{color:#bf6816!important}
+.pair-workspace{padding:clamp(18px,2vw,28px)}
+.pair-title-field{width:min(455px,100%);max-width:455px;font-size:13px;gap:5px!important}
+.pair-title-field input{height:56px;min-height:56px;font-size:18px!important;padding:8px 12px!important}
+.pair-instruction-field{width:min(455px,100%);max-width:455px;font-size:13px}
+.pair-instruction-field input{height:44px;min-height:44px;padding:8px 10px!important}
+.pair-content-editor{gap:11px}
+.pair-content-cell{height:56px;min-height:56px}
+.pair-content-cell input:not([type=file]){height:54px;min-height:54px;padding:8px 10px!important;font-size:16px}
+.pair-content-row{grid-template-columns:36px minmax(0,1fr) minmax(0,1fr) 100px;gap:8px}
+.pair-table-head{grid-template-columns:36px minmax(0,1fr) minmax(0,1fr) 100px;gap:8px}
+.pair-table-head button{padding:7px;font-size:12px}
+.pair-editor-top{display:none}
+.pair-content-row,.pair-table-head{grid-template-columns:36px minmax(0,455px) minmax(0,455px) 100px}
+@media(max-width:760px){.pair-content-row,.pair-table-head{grid-template-columns:30px minmax(0,1fr) minmax(0,1fr)}.pair-content-row>.editor-row-actions{grid-column:2/4;grid-row:2;justify-content:flex-end}.pair-table-head button{grid-column:2/4}.pair-content-cell{min-height:48px;height:48px}.pair-content-cell input:not([type=file]){height:46px;min-height:46px;font-size:14px;padding:6px!important}}

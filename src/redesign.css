@@ -144,5 +144,6 @@
 .teacher-page .student-password{background:#f1f6ef}
 .teacher-page .student-card-grid .student-account-card{border-color:#dce6dc;background:#fffefa;box-shadow:0 4px 15px rgba(45,72,52,.06)}
 @media(max-width:780px){.teacher-topbar{padding:8px 13px}.teacher-tabs.teacher-nav{flex-basis:100%;margin:2px 0 -7px}.teacher-nav a,.teacher-nav button{padding:8px 8px;font-size:12px}}
-
-/* Publish the corrected 435 × 112 px illustrated activity chooser. */
+.upload-label{display:flex;align-items:center;gap:9px;flex-wrap:wrap;font-weight:700;color:#4b6252}.upload-label small{width:100%;color:#738276;font-size:11px;font-weight:500}
+.label-row{grid-template-columns:17px minmax(80px,1fr) 40px auto 126px}.label-row>.editor-row-actions{justify-content:flex-end}.label-row .small-button{max-width:170px;overflow:hidden;text-overflow:ellipsis}
+@media(max-width:700px){.label-row{grid-template-columns:17px minmax(70px,1fr) 34px auto 112px;gap:4px}.label-row .editor-row-action{width:26px;height:28px}.label-row>.editor-row-actions{gap:0}}
