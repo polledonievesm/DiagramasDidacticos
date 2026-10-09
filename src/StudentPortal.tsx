@@ -53,20 +53,45 @@ export default function StudentPortal() {
   const [portal,setPortal]=useState<PortalData|null>(null);
   const [credentials,setCredentials]=useState({username:"",password:""});
   const [busy,setBusy]=useState(false);
+  const [checkingSession,setCheckingSession]=useState(()=>Boolean(session?.token));
   const [notice,setNotice]=useState("");
   const [selectedField,setSelectedField]=useState(new URLSearchParams(window.location.search).get("campo")||"");
 
   async function load(token:string) {
     const response=await apiRequest("/api/student/portal?studentToken="+encodeURIComponent(token));
     const data=await response.json();
-    if(!response.ok) throw new Error(data.error||"No se pudo abrir el portal del alumno.");
+    if(!response.ok) {
+      const error=Object.assign(new Error(data.error||"No se pudo abrir el portal del alumno."),{status:response.status});
+      throw error;
+    }
     const enriched=data as PortalData;
     enriched.activities=enriched.activities.map(item=>({...item,fieldFormative:fieldFromCover(item.imageUrl)}));
     setPortal(enriched);
     saveStudentSession(token,(data as PortalData).student);
   }
 
-  useEffect(()=>{if(session?.token) void load(session.token).catch(error=>{clearStudentSession();setSession(null);setNotice(error instanceof Error?error.message:"La sesión venció. Inicia sesión otra vez.");});},[]);
+  useEffect(()=>{
+    if(!session?.token) { setCheckingSession(false); return; }
+    let active=true;
+    setCheckingSession(true); setNotice("");
+    void load(session.token).catch(error=>{
+      if(!active) return;
+      const expired=typeof error==="object"&&error!==null&&"status" in error&&Number((error as {status:unknown}).status)===401;
+      if(expired) { clearStudentSession(); setSession(null); }
+      setNotice(error instanceof Error?error.message:"No se pudo abrir el portal del alumno.");
+    }).finally(()=>{if(active)setCheckingSession(false);});
+    return ()=>{active=false;};
+  },[session?.token]);
+
+  useEffect(()=>{
+    const syncSession=()=>{
+      const latest=getStudentSession();
+      if(!latest?.token) { setSession(null); setPortal(null); setCheckingSession(false); setNotice("La sesión se cerró en otra pestaña."); return; }
+      if(session?.token!==latest.token) { setPortal(null); setNotice(""); setCheckingSession(true); setSession(latest); }
+    };
+    window.addEventListener("storage",syncSession);
+    return ()=>window.removeEventListener("storage",syncSession);
+  },[]);
 
   async function signIn(event:React.FormEvent) {
     event.preventDefault(); setBusy(true); setNotice("");
@@ -80,7 +105,32 @@ export default function StudentPortal() {
     finally { setBusy(false); }
   }
 
-  function signOut() { clearStudentSession();setSession(null);setPortal(null);setNotice(""); }
+  function signOut() { clearStudentSession();setSession(null);setPortal(null);setCheckingSession(false);setNotice(""); }
+
+  async function retrySession() {
+    if(!session?.token) return;
+    setCheckingSession(true); setNotice("");
+    try { await load(session.token); }
+    catch(error) {
+      const expired=typeof error==="object"&&error!==null&&"status" in error&&Number((error as {status:unknown}).status)===401;
+      if(expired) { clearStudentSession(); setSession(null); }
+      setNotice(error instanceof Error?error.message:"No se pudo abrir el portal del alumno.");
+    } finally { setCheckingSession(false); }
+  }
+
+  if(!portal&&session?.token) return (
+    <main className="student-portal sp-login-view">
+      <header className="sp-login-header"><a className="sp-brand" href="./"><span className="sp-brand-mark">✦</span>Aula en juego</a><span>Espacio del alumno</span></header>
+      <section className="sp-login" aria-live="polite">
+        <span className="sp-kicker">SESIÓN DEL ALUMNO</span>
+        <h1>{checkingSession?"Abriendo tus actividades":"Tu sesión sigue guardada"}</h1>
+        <p>{checkingSession?"Estamos comprobando tu acceso.":notice||"No pudimos conectar con Apps Script. Conservamos tu sesión para que puedas volver a intentarlo."}</p>
+        {notice&&!checkingSession&&<p className="sp-notice" role="alert">{notice}</p>}
+        <button disabled={checkingSession} onClick={()=>void retrySession()}>{checkingSession?"Conectando…":"Reintentar conexión"}</button>
+        <button type="button" className="sp-logout" onClick={signOut}>Cerrar sesión</button>
+      </section>
+    </main>
+  );
 
   if(!portal) return (
     <main className="student-portal sp-login-view">
