@@ -1,7 +1,7 @@
 export type DigestiveLabel = { id: string; text: string; color: string; x: number; y: number };
 export type PairSide = { text: string; imageUrl?: string | null; imageData?: string | null };
 export type MatchingPair = { id: string; left: PairSide; right: PairSide };
-export type QuizOption = { id: string; text: string };
+export type QuizOption = { id: string; text: string; imageUrl?: string | null; imageData?: string | null };
 export type QuizQuestion = { id: string; prompt: string; imageUrl?: string | null; imageData?: string | null; options: QuizOption[]; correctOptionId: string };
 export type SortGroup = { id: string; title: string; color: string };
 export type SortItem = { id: string; text: string; imageUrl?: string | null; imageData?: string | null; groupId: string };
