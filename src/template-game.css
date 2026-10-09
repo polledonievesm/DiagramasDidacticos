@@ -42,3 +42,34 @@
 .game-focus-blurred .pair-board{filter:blur(14px);pointer-events:none;user-select:none}
 @media(max-width:680px){.tg-quiz-question-row .tg-options{grid-template-columns:1fr}.tg-quiz-question-row{padding:9px}.tg-shell{padding:13px}}
 .tg-group-edit-row{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:6px 8px;padding:8px 10px;border:1px solid #e2e9e0;border-radius:10px;background:#fbfcf8}.tg-group-edit-row>label{min-width:0}
+
+/* Alinea las pantallas de edición con el espacio azul claro del editor de parejas. */
+.tg-page{background:#edf7fb;color:#242f39}
+.tg-header{border-color:#dceaf0;background:#fff;color:#536b79}
+.tg-header a{color:#268bb5}
+.tg-shell,.tg-play-shell,.tg-login,.tg-result{border-color:#dfeaf0;background:#fff;box-shadow:0 8px 26px #263f5010}
+.tg-title h1,.tg-login h1,.tg-result h1{color:#202e39}
+.tg-kicker,.tg-question-count{color:#3788aa}
+.tg-primary{background:#25a3dc}
+.tg-primary:hover{background:#168ec8}
+.tg-editor-row{border-color:#dfe8ed;background:#fbfdfe}
+.tg-quiz-question-row{grid-template-columns:minmax(0,1fr);gap:9px;padding:12px}
+.tg-quiz-question-row>header{min-height:26px}
+.tg-prompt-label{display:grid;gap:5px}
+.tg-field-with-image{display:flex;align-items:center;min-width:0;min-height:46px;border:1px solid #c9d3d9;background:#fff}
+.tg-field-with-image:focus-within{border-color:#279bd1;box-shadow:0 0 0 1px #279bd1}
+.tg-field-with-image>input:not([type=file]){flex:1;min-width:0;min-height:44px;height:44px;border:0!important;border-radius:0!important;box-shadow:none!important;background:transparent}
+.tg-field-with-image>.editor-image-picker{flex:0 0 auto;margin:0 5px 0 0}
+.tg-field-with-image .editor-image-trigger{width:34px;height:34px;border:0;background:transparent;color:#df8429}
+.tg-options{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.tg-quiz-question-row .tg-options>.tg-quiz-option{grid-template-columns:25px minmax(0,1fr) 28px;gap:6px;padding:6px;border-color:#d5dfe5;border-radius:3px}
+.tg-option-field{min-height:40px}
+.tg-quiz-question-row .tg-option-field>input:not([type=file]){height:38px;min-height:38px;padding:5px 6px}
+.tg-quiz-question-row .tg-option-field .editor-image-picker{margin-right:2px}
+.tg-quiz-question-row .tg-option-field .editor-image-trigger{width:28px;height:30px;padding:2px}
+.tg-quiz-question-row .tg-correct-mark{width:27px;height:27px;min-height:27px}
+.tg-quiz-question-row .tg-options{grid-template-columns:repeat(2,minmax(0,1fr))}
+.tg-answer-grid button{display:flex;align-items:center;gap:10px;text-align:left}
+.tg-answer-grid button img{width:46px;height:40px;object-fit:contain;flex:0 0 auto}
+.tg-sequence-image .editor-image-trigger{border:1px solid #f0bc82;background:#fff5e9;color:#df8429}
+@media(max-width:680px){.tg-quiz-question-row .tg-options{grid-template-columns:repeat(2,minmax(0,1fr))}.tg-quiz-question-row{padding:9px}.tg-option-field .editor-image-preview img{width:30px;height:28px}}
