@@ -44,13 +44,6 @@ function setupMigration() {
   Logger.log('Después, implementa el proyecto como Aplicación web y copia la URL /exec en config.js.');
 }
 
-// Run once from the Apps Script editor after adding the Gemini key, so the
-// project owner grants UrlFetchApp's external-request permission in advance.
-function authorizeGeminiAccess() {
-  const response = UrlFetchApp.fetch('https://generativelanguage.googleapis.com', { muteHttpExceptions: true });
-  Logger.log('Permiso para solicitudes externas concedido. Respuesta del servicio: ' + response.getResponseCode());
-}
-
 function doGet(e) {
   const p = e && e.parameter ? e.parameter : {};
   const callback = String(p.callback || '');
@@ -81,7 +74,6 @@ function doPost(e) {
     else if (body.action === 'setActivityDeadline') result = setActivityDeadline_(body);
     else if (body.action === 'setActivityDesign') result = setActivityDesign_(body);
     else if (body.action === 'setActivityStudents') result = setActivityStudents_(body);
-    else if (body.action === 'generateActivityContent') result = generateActivityContent_(body);
     else result = { error: 'Operación no reconocida.' };
     return output_(result, 'json');
   } catch (err) {
@@ -99,7 +91,6 @@ function routeGet_(p) {
   if (action === 'leaderboard') return leaderboard_(String(p.activityId || 'digestivo-inicial'));
   if (action === 'studentPortal') return studentPortal_(String(p.studentToken || ''));
   if (action === 'capabilities') return { apiVersion: 5, kinds: ['diagram', 'pairs', 'quiz', 'quiz-show', 'true-false', 'group-sort', 'sequence', 'flashcards', 'memory', 'complete-sentence', 'complete-phrase', 'word-order', 'roulette', 'word-search', 'crossword'] };
-  if (action === 'aiResult') return aiGenerationResult_(String(p.requestId || ''));
   if (!authorized_(p.key)) return { error: 'Clave del maestro incorrecta.' };
   if (action === 'activities') return listActivities_();
   if (action === 'results') return listResults_();
@@ -114,7 +105,7 @@ function saveActivity_(body) {
   const title = String(body.title || '').trim().slice(0, 120);
   if (!title) throw new Error('Escribe el título de la actividad.');
   if (body.kind === 'pairs') return savePairActivity_(body, id, title);
-  if (['quiz', 'quiz-show', 'true-false', 'group-sort', 'sequence', 'complete-sentence', 'complete-phrase', 'word-order', 'roulette', 'word-search', 'crossword'].includes(body.kind)) return saveTemplateActivity_(body, id, title);
+  if (['quiz', 'quiz-show', 'true-false', 'group-sort', 'sequence', 'flashcards', 'memory', 'complete-sentence', 'complete-phrase', 'word-order', 'roulette', 'word-search', 'crossword'].includes(body.kind)) return saveTemplateActivity_(body, id, title);
   if (!Array.isArray(body.labels) || body.labels.length < 1 || body.labels.length > 10) throw new Error('La actividad requiere de 1 a 10 etiquetas.');
 
   const sheet = spreadsheet_().getSheetByName(TAB_ACTIVITIES);
@@ -152,6 +143,7 @@ function saveActivity_(body) {
     labels: labels,
     assignedStudentIds: Array.isArray(body.assignedStudentIds) ? body.assignedStudentIds.map(String) : old ? old.config.assignedStudentIds : []
   };
+  applySharedActivitySettings_(activity, body);
   const now = new Date();
   const row = [id, title, JSON.stringify(activity), imageUrl, now];
   if (old) sheet.getRange(old.row, 1, 1, row.length).setValues([row]);
@@ -288,6 +280,7 @@ function saveTemplateActivity_(body, id, title) {
     assignedStudentIds: Array.isArray(body.assignedStudentIds) ? body.assignedStudentIds.map(String) : (old && old.config.assignedStudentIds) || []
   };
   Object.keys(content).forEach(function(key) { activity[key] = content[key]; });
+  applySharedActivitySettings_(activity, body);
   const row = [id, title, JSON.stringify(activity), '', new Date()];
   if (old) sheet.getRange(old.row, 1, 1, row.length).setValues([row]); else sheet.appendRow(row);
   return activity;
@@ -320,10 +313,22 @@ function savePairActivity_(body, id, title) {
     cardTheme: ['mint', 'sky', 'lilac', 'peach'].indexOf(String(body.cardTheme || (old && old.config.cardTheme) || 'mint')) >= 0 ? String(body.cardTheme || (old && old.config.cardTheme) || 'mint') : 'mint', labels: [], pairs: pairs,
     assignedStudentIds: Array.isArray(body.assignedStudentIds) ? body.assignedStudentIds.map(String) : old ? old.config.assignedStudentIds : []
   };
+  applySharedActivitySettings_(activity, body);
   const sheet = spreadsheet_().getSheetByName(TAB_ACTIVITIES), now = new Date();
   const row = [id, title, JSON.stringify(activity), '', now];
   if (old) sheet.getRange(old.row, 1, 1, row.length).setValues([row]); else sheet.appendRow(row);
   return activity;
+}
+
+function applySharedActivitySettings_(activity, body) {
+  const fallbackShuffle = body.shuffle !== false;
+  const fields = ['lenguajes', 'saberes', 'etica', 'humano'];
+  activity.shuffleQuestions = body.shuffleQuestions === undefined ? fallbackShuffle : body.shuffleQuestions !== false;
+  activity.shuffleAnswers = body.shuffleAnswers === undefined ? fallbackShuffle : body.shuffleAnswers !== false;
+  activity.showAnswersAtEnd = body.showAnswersAtEnd === true;
+  activity.showLeaderboard = body.showLeaderboard === true;
+  activity.blurWhenInactive = body.blurWhenInactive === true;
+  activity.fieldFormative = fields.indexOf(String(body.fieldFormative || '')) >= 0 ? String(body.fieldFormative) : '';
 }
 
 function listPairActivities_() {
@@ -580,62 +585,6 @@ function setActivityStudents_(body) {
   spreadsheet_().getSheetByName(TAB_ACTIVITIES).getRange(row.row, 3).setValue(JSON.stringify(activity));
   spreadsheet_().getSheetByName(TAB_ACTIVITIES).getRange(row.row, 5).setValue(new Date());
   return { id: id, assignedStudentIds: requested };
-}
-
-function generateActivityContent_(body) {
-  const requestId = String(body.requestId || '').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 100);
-  try { return generateActivityContentImpl_(body); }
-  catch (err) {
-    if (requestId) CacheService.getScriptCache().put('ai:' + requestId, JSON.stringify({ error: String(err && err.message || 'No se pudo generar el contenido.') }), 300);
-    return { ok: true };
-  }
-}
-
-function generateActivityContentImpl_(body) {
-  if (!authorized_(body.key)) throw new Error('Inicia sesión como maestro para usar el generador.');
-  const requestId = String(body.requestId || '').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 100);
-  if (!requestId) throw new Error('Falta el identificador de solicitud.');
-  const props = PropertiesService.getScriptProperties(), apiKey = props.getProperty('GEMINI_API_KEY');
-  if (!apiKey) throw new Error('Falta configurar GEMINI_API_KEY en las propiedades del proyecto de Apps Script.');
-  const kind = String(body.kind || ''), title = String(body.title || '').slice(0, 120), topic = String(body.topic || '').trim().slice(0, 500);
-  if (!topic) throw new Error('Escribe el tema para preparar el contenido.');
-  const count = Math.max(3, Math.min(15, Number(body.count) || 6));
-  const schema = {
-    'diagram': '{"labels":[{"text":"etiqueta corta"}]}',
-    'pairs': '{"pairs":[{"leftText":"concepto","rightText":"pareja"}]}',
-    'memory': '{"pairs":[{"leftText":"concepto","rightText":"pareja"}]}',
-    'flashcards': '{"pairs":[{"leftText":"frente","rightText":"reverso"}]}',
-    'quiz': '{"questions":[{"prompt":"pregunta","options":["A","B","C","D"],"correctIndex":0}]}',
-    'quiz-show': '{"questions":[{"prompt":"pregunta","options":["A","B","C","D"],"correctIndex":0}]}',
-    'true-false': '{"questions":[{"prompt":"afirmación","correct":true}]}',
-    'group-sort': '{"groups":["grupo A","grupo B"],"items":[{"text":"elemento","groupIndex":0}]}',
-    'sequence': '{"steps":[{"text":"paso en orden correcto"}]}',
-    'complete-sentence': '{"sentences":[{"before":"texto antes del espacio","answer":"respuesta","after":"texto después"}]}',
-    'complete-phrase': '{"sentences":[{"before":"texto antes","answer":"palabra a completar","after":"texto después"}]}',
-    'word-order': '{"wordSentences":[{"text":"oración correcta"}]}',
-    'roulette': '{"wheelEntries":[{"text":"pregunta o reto breve"}]}',
-    'word-search': '{"wordSearchWords":["PALABRA"]}',
-    'crossword': '{"crosswordClues":[{"clue":"pista clara","answer":"respuesta","direction":"across"}]}'
-  };
-  if (!schema[kind]) throw new Error('La IA no está configurada para esta plantilla.');
-  const prompt = 'Crea contenido educativo en español para primaria, grado/edad: ' + String(body.grade || '4.º de primaria').slice(0, 50) + '. Tema: ' + topic + '. Título: ' + title + '. Genera exactamente ' + count + ' elementos útiles, correctos y apropiados. Devuelve solo JSON válido con este esquema y sus campos: ' + schema[kind] + '. No incluyas Markdown. No generes imágenes, direcciones web ni HTML. En opción múltiple agrega 4 opciones y correctIndex como índice 0 a 3. En verdadero/falso incluye correct true o false. Para clasificar, crea 2 a 4 grupos y asigna groupIndex. En sopa de letras usa palabras de máximo 12 letras, sin espacios. Para el diagrama da solo etiquetas cortas.';
-  const model = props.getProperty('GEMINI_MODEL') || 'gemini-3.5-flash';
-  const url = 'https://generativelanguage.googleapis.com/v1beta/models/' + encodeURIComponent(model) + ':generateContent?key=' + encodeURIComponent(apiKey);
-  const response = UrlFetchApp.fetch(url, { method: 'post', contentType: 'application/json', muteHttpExceptions: true, payload: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { responseMimeType: 'application/json', temperature: 0.65 } }) });
-  const status = response.getResponseCode(), raw = response.getContentText();
-  if (status < 200 || status >= 300) throw new Error('Gemini no pudo generar el contenido (HTTP ' + status + '). Revisa la clave y el límite de uso de Google AI Studio.');
-  const envelope = JSON.parse(raw), text = envelope.candidates && envelope.candidates[0] && envelope.candidates[0].content && envelope.candidates[0].content.parts && envelope.candidates[0].content.parts.map(function(part) { return part.text || ''; }).join('');
-  if (!text) throw new Error('La IA no devolvió contenido. Intenta con otro tema.');
-  let content;
-  try { content = JSON.parse(text.replace(/^```json\s*|\s*```$/g, '')); } catch (_) { throw new Error('La IA devolvió un formato que no se pudo leer. Intenta de nuevo.'); }
-  CacheService.getScriptCache().put('ai:' + requestId, JSON.stringify({ content: content }), 300);
-  return { ok: true };
-}
-
-function aiGenerationResult_(requestId) {
-  if (!requestId) return { error: 'Falta el identificador de solicitud.' };
-  const value = CacheService.getScriptCache().get('ai:' + requestId);
-  return value ? JSON.parse(value) : { pending: true };
 }
 
 function activityAvailabilityError_(activity) {
