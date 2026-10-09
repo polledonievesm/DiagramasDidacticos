@@ -127,7 +127,7 @@ function jsonpOnce<T>(params: Record<string, string>): Promise<T> {
     };
     (window as unknown as Record<string, unknown>)[callback] = (data: T) => finish(undefined, data);
     const query = new URLSearchParams({ ...params, callback, _cb: `${Date.now()}-${Math.random().toString(36).slice(2)}` });
-    script.onerror = () => finish(new Error("No se pudo conectar con Apps Script."));
+    script.onerror = () => finish(new Error("No se pudo conectar con Apps Script. La URL /exec no respondió o la implementación no permite acceso público."));
     script.src = `${endpoint()}?${query.toString()}`;
     document.head.appendChild(script);
   });
@@ -139,7 +139,7 @@ async function jsonp<T>(params: Record<string, string>): Promise<T> {
     try { return await jsonpOnce<T>(params); }
     catch (error) {
       lastError = error;
-      const isNetworkError = error instanceof Error && error.message === "No se pudo conectar con Apps Script.";
+      const isNetworkError = error instanceof Error && error.message.startsWith("No se pudo conectar con Apps Script.");
       if (!isNetworkError || attempt === 2) break;
       await new Promise(resolve => window.setTimeout(resolve, 400 * (attempt + 1)));
     }
@@ -414,11 +414,11 @@ export async function apiRequest(path: string, init: RequestInit = {}) {
 }
 
 export async function supportsActivityKind(kind: string) {
-  try {
-    const result = await apiRequest("/api/capabilities");
-    const data = await result.json();
-    return result.ok && Array.isArray(data.kinds) && data.kinds.includes(kind);
-  } catch { return false; }
+  const result = await apiRequest("/api/capabilities");
+  const data = await result.json();
+  if (data && typeof data.error === "string") throw new Error(`Apps Script respondió con un error: ${data.error}`);
+  if (!result.ok || !Array.isArray(data.kinds)) throw new Error("Apps Script respondió en un formato que la página no reconoce. Implementa la versión actual de Code.gs.");
+  return data.kinds.includes(kind);
 }
 
 export async function saveActivityAvailability(key: string, activity: Pick<Activity, "id" | "availableFrom" | "availableUntil">) {
