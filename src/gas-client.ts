@@ -347,17 +347,6 @@ export async function apiRequest(path: string, init: RequestInit = {}) {
     cachedActivities.set(activity.id, activity);
     return response(activity as unknown as ApiResult);
   }
-  if (method === "POST" && url.pathname.endsWith("/api/teacher/ai-generate")) {
-    const key = new Headers(init.headers).get("x-teacher-key") || "";
-    const requestId = crypto.randomUUID();
-    await send({ ...body, action: "generateActivityContent", requestId, key });
-    for (let i = 0; i < 90; i++) {
-      const data = await jsonp<ApiResult>({ action: "aiResult", requestId });
-      if (!data.pending) return response(data, "error" in data ? 400 : 200);
-      await new Promise((resolve) => window.setTimeout(resolve, 1000));
-    }
-    return response({ error: "La generación tardó más de lo esperado. Vuelve a intentarlo." }, 504);
-  }
   if (method === "POST" && url.pathname.endsWith("/api/teacher/activity-archive")) {
     const key = new Headers(init.headers).get("x-teacher-key") || "";
     const id = String(body.id || "");
