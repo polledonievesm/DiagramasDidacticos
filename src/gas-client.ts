@@ -6,6 +6,8 @@ let cachedActivity: Activity | null = null;
 const teacherKeyNames = ["platformTeacherKey", "pairTeacherKey", "diagramTeacherKey"] as const;
 const TEACHER_USERNAME_KEY = "aulaTeacherUsername";
 const STUDENT_SESSION_KEY = "aulaStudentSessionV1";
+const SESSION_ROLE_KEY = "aulaSessionRoleV1";
+const SESSION_CHANGED_EVENT = "aula-session-change";
 export type StudentSessionProfile = { id:string; name?:string; givenNames:string; paternalSurname:string; maternalSurname:string; username:string };
 
 export function getStudentSession() {
@@ -24,8 +26,34 @@ export function saveStudentSession(token: string, student: StudentSessionProfile
   const value = JSON.stringify({ token, student: normalized });
   try { localStorage.setItem(STUDENT_SESSION_KEY, value); } catch { /* La sesión de pestaña sigue disponible. */ }
   try { sessionStorage.setItem(STUDENT_SESSION_KEY, value); } catch { /* El inicio permanece válido aunque la pestaña bloquee almacenamiento. */ }
+  try { localStorage.setItem(SESSION_ROLE_KEY, "student"); } catch { /* La sesión permanece válida aunque el navegador limite el almacenamiento. */ }
+  window.dispatchEvent(new Event(SESSION_CHANGED_EVENT));
 }
-export function clearStudentSession() { try { localStorage.removeItem(STUDENT_SESSION_KEY); } catch {} try { sessionStorage.removeItem(STUDENT_SESSION_KEY); } catch {} }
+export function clearStudentSession() {
+  try { localStorage.removeItem(STUDENT_SESSION_KEY); } catch {}
+  try { sessionStorage.removeItem(STUDENT_SESSION_KEY); } catch {}
+  try {
+    if (localStorage.getItem(SESSION_ROLE_KEY) === "student") {
+      const teacherSignedIn = teacherKeyNames.some(name => Boolean(localStorage.getItem(name)));
+      if (teacherSignedIn) localStorage.setItem(SESSION_ROLE_KEY, "teacher");
+      else localStorage.removeItem(SESSION_ROLE_KEY);
+    }
+  } catch {}
+  window.dispatchEvent(new Event(SESSION_CHANGED_EVENT));
+}
+
+export function getSessionRole(): "student" | "teacher" | "" {
+  try {
+    const role = localStorage.getItem(SESSION_ROLE_KEY);
+    if (role === "student" && getStudentSession()?.token) return "student";
+    if (role === "teacher" && getTeacherKey()) return "teacher";
+  } catch { /* Revisa abajo las sesiones guardadas en esta pestaña. */ }
+  if (getStudentSession()?.token) return "student";
+  if (getTeacherKey()) return "teacher";
+  return "";
+}
+
+export function sessionChangedEventName() { return SESSION_CHANGED_EVENT; }
 
 export function getTeacherKey() {
   for (const name of teacherKeyNames) {
@@ -46,6 +74,8 @@ export function rememberTeacherKey(value: string, username = "") {
     sessionStorage.setItem(name, value);
   });
   if (username) localStorage.setItem(TEACHER_USERNAME_KEY, username);
+  try { localStorage.setItem(SESSION_ROLE_KEY, "teacher"); } catch { /* La clave de esta pestaña sigue disponible. */ }
+  window.dispatchEvent(new Event(SESSION_CHANGED_EVENT));
 }
 
 export function getTeacherUsername() {
@@ -60,6 +90,13 @@ export function forgetTeacherKey() {
     sessionStorage.removeItem(name);
   });
   localStorage.removeItem(TEACHER_USERNAME_KEY);
+  try {
+    if (localStorage.getItem(SESSION_ROLE_KEY) === "teacher") {
+      if (getStudentSession()?.token) localStorage.setItem(SESSION_ROLE_KEY, "student");
+      else localStorage.removeItem(SESSION_ROLE_KEY);
+    }
+  } catch {}
+  window.dispatchEvent(new Event(SESSION_CHANGED_EVENT));
 }
 
 export async function logoutTeacher() {
@@ -77,7 +114,7 @@ function endpoint() {
   return value;
 }
 
-function jsonp<T>(params: Record<string, string>): Promise<T> {
+function jsonpOnce<T>(params: Record<string, string>): Promise<T> {
   return new Promise((resolve, reject) => {
     const callback = `gasCallback_${Date.now()}_${Math.random().toString(36).slice(2)}`;
     const script = document.createElement("script");
@@ -89,11 +126,25 @@ function jsonp<T>(params: Record<string, string>): Promise<T> {
       error ? reject(error) : resolve(data as T);
     };
     (window as unknown as Record<string, unknown>)[callback] = (data: T) => finish(undefined, data);
-    const query = new URLSearchParams({ ...params, callback });
+    const query = new URLSearchParams({ ...params, callback, _cb: `${Date.now()}-${Math.random().toString(36).slice(2)}` });
     script.onerror = () => finish(new Error("No se pudo conectar con Apps Script."));
     script.src = `${endpoint()}?${query.toString()}`;
     document.head.appendChild(script);
   });
+}
+
+async function jsonp<T>(params: Record<string, string>): Promise<T> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try { return await jsonpOnce<T>(params); }
+    catch (error) {
+      lastError = error;
+      const isNetworkError = error instanceof Error && error.message === "No se pudo conectar con Apps Script.";
+      if (!isNetworkError || attempt === 2) break;
+      await new Promise(resolve => window.setTimeout(resolve, 400 * (attempt + 1)));
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error("No se pudo conectar con Apps Script.");
 }
 
 async function send(payload: Record<string, unknown>) {
@@ -175,10 +226,10 @@ export async function apiRequest(path: string, init: RequestInit = {}) {
   if (method === "POST" && url.pathname.endsWith("/api/student/login")) {
     const requestId = crypto.randomUUID();
     await send({ action: "studentLogin", requestId, username: String(body.username || ""), password: String(body.password || "") });
-    for (let i = 0; i < 12; i++) {
+    for (let i = 0; i < 30; i++) {
       const data = await jsonp<ApiResult>({ action: "loginResult", requestId });
       if (!data.pending) return response(data, "error" in data ? 401 : 200);
-      await new Promise((resolve) => window.setTimeout(resolve, 250));
+      await new Promise((resolve) => window.setTimeout(resolve, 300));
     }
     return response({ error: "El acceso tardó demasiado. Vuelve a intentarlo." }, 503);
   }
