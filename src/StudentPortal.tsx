@@ -4,6 +4,7 @@ import type { ActivityKind } from "./default-activity";
 import type { FormativeField } from "./default-activity";
 import { fieldFromCover } from "./formative-field";
 import "./student-portal.css";
+import PasswordField from "./PasswordField";
 
 type PortalActivity = { id:string; title:string; instructions?:string; kind:ActivityKind; imageUrl?:string; theme?:"mint"|"sky"|"lilac"|"peach"; fieldFormative?:FormativeField|""; availableFrom:string|null; dueAt:string|null; scheduled:boolean; expired:boolean; attempts:number; bestGrade:number|null; completed:boolean };
 type PortalData = { student:{id:string;name:string;givenNames:string;paternalSurname:string;maternalSurname:string;username:string}; activities:PortalActivity[]; average:number|null; completedCount:number };
@@ -139,7 +140,7 @@ export default function StudentPortal() {
         <span className="sp-kicker">ACCESO DEL ALUMNO</span><h1>Entra a tus actividades</h1>
         <p>Usa el usuario y la contraseña que te entregó tu maestro.</p>
         <label>Usuario<input autoComplete="username" value={credentials.username} onChange={event=>setCredentials({...credentials,username:event.target.value})} required/></label>
-        <label>Contraseña<input type="password" autoComplete="current-password" value={credentials.password} onChange={event=>setCredentials({...credentials,password:event.target.value})} required/></label>
+        <label>Contraseña<PasswordField autoComplete="current-password" value={credentials.password} onChange={event=>setCredentials({...credentials,password:event.target.value})} required/></label>
         {notice&&<p className="sp-notice">{notice}</p>}
         <button disabled={busy}>{busy?"Entrando…":"Ver mis actividades"}</button>
       </form>

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { apiRequest, rememberTeacherKey, saveStudentSession } from "./gas-client";
 import "./home-gate.css";
+import PasswordField from "./PasswordField";
 
 type Role = "student" | "teacher";
 
@@ -65,7 +66,7 @@ export default function HomeGate() {
           <button type="button" role="tab" aria-selected={role === "teacher"} className={role === "teacher" ? "selected" : ""} onClick={() => { setRole("teacher"); setNotice(""); }}>Maestro</button>
         </div>
         <label>Nombre de usuario<input autoComplete="username" value={credentials.username} onChange={event => setCredentials({ ...credentials, username: event.target.value })} required placeholder={role === "teacher" ? "Usuario docente" : "Usuario de tu tarjeta"} /></label>
-        <label>Contraseña<input type="password" autoComplete="current-password" value={credentials.password} onChange={event => setCredentials({ ...credentials, password: event.target.value })} required placeholder="Escribe tu contraseña" /></label>
+        <label>Contraseña<PasswordField autoComplete="current-password" value={credentials.password} onChange={event => setCredentials({ ...credentials, password: event.target.value })} required placeholder="Escribe tu contraseña" /></label>
         {notice && <p className="hg-notice" role="alert">{notice}</p>}
         <button className="hg-submit" disabled={busy}>{busy ? "Verificando…" : role === "teacher" ? "Entrar al espacio docente" : "Ver mis actividades"}<span aria-hidden="true">→</span></button>
         <small className="hg-help">{role === "teacher" ? "Usa la cuenta docente de la plataforma." : "Usa los datos de acceso que te entregó tu maestro."}</small>
