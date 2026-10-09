@@ -47,7 +47,12 @@ function setupMigration() {
 function doGet(e) {
   const p = e && e.parameter ? e.parameter : {};
   const callback = String(p.callback || '');
-  const result = routeGet_(p);
+  let result;
+  try {
+    result = routeGet_(p);
+  } catch (err) {
+    result = { error: String(err && err.message || 'Apps Script no pudo leer los datos.') };
+  }
   if (callback) {
     if (!/^[A-Za-z_$][\w.$]{0,100}$/.test(callback)) return output_({ error: 'Callback inválido.' }, 'json');
     return ContentService.createTextOutput(callback + '(' + JSON.stringify(result) + ');')
@@ -57,8 +62,9 @@ function doGet(e) {
 }
 
 function doPost(e) {
+  let body = {};
   try {
-    const body = JSON.parse((e && e.postData && e.postData.contents) || '{}');
+    body = JSON.parse((e && e.postData && e.postData.contents) || '{}');
     let result;
     if (body.action === 'submit') result = saveResult_(body);
     else if (body.action === 'saveActivity') result = saveActivity_(body);
@@ -77,7 +83,15 @@ function doPost(e) {
     else result = { error: 'Operación no reconocida.' };
     return output_(result, 'json');
   } catch (err) {
-    return output_({ error: String(err && err.message || 'No se pudo completar la operación.') }, 'json');
+    const message = String(err && err.message || 'No se pudo completar la operación.');
+    const requestId = String(body && body.requestId || '');
+    if (/^[a-f0-9-]{30,40}$/i.test(requestId) && body.action === 'studentLogin') {
+      CacheService.getScriptCache().put('student-login:' + requestId, JSON.stringify({ error: message }), 60);
+    }
+    if (/^[a-f0-9-]{30,40}$/i.test(requestId) && body.action === 'teacherLogin') {
+      CacheService.getScriptCache().put('teacher-login:' + requestId, JSON.stringify({ error: message }), 60);
+    }
+    return output_({ error: message }, 'json');
   }
 }
 
@@ -133,7 +147,7 @@ function saveActivity_(body) {
   const activity = {
     id: id,
     title: title,
-    instructions: 'Arrastra y suelta las chinchetas en su lugar correcto de la imagen.',
+    instructions: String(body.instructions || 'Arrastra y suelta las chinchetas en su lugar correcto de la imagen.').trim().slice(0, 240),
     timerMode: mode,
     timeLimitSeconds: clamp_(body.timeLimitSeconds || 180, 15, 3600),
     maxAttempts: body.maxAttempts === null ? null : clamp_(body.maxAttempts || 3, 1, 35),
@@ -185,7 +199,7 @@ function saveTemplateActivity_(body, id, title) {
       const clueId = unique_(item.id, 'pista-' + (i + 1));
       const clue = String(item.clue || '').trim().slice(0, 240), answer = String(item.answer || '').trim().slice(0, 24);
       if (!clue || normalizeWord_(answer).length < 2) throw new Error('Cada pista necesita una pregunta y una respuesta de al menos 2 letras.');
-      return { id: clueId, clue: clue, answer: answer, direction: item.direction === 'down' ? 'down' : 'across' };
+      return { id: clueId, clue: clue, answer: answer, imageUrl: image_(item, clueId), direction: item.direction === 'down' ? 'down' : 'across' };
     });
   } else if (kind === 'quiz' || kind === 'quiz-show' || kind === 'true-false') {
     if (!Array.isArray(body.questions) || body.questions.length < 1 || body.questions.length > 50) throw new Error('Agrega entre 1 y 50 preguntas.');
@@ -201,7 +215,7 @@ function saveTemplateActivity_(body, id, title) {
         optionIds[optionId] = true;
         const text = String(option.text || '').trim().slice(0, 240);
         if (!text) throw new Error('Completa todas las opciones.');
-        return { id: optionId, text: text };
+        return { id: optionId, text: text, imageUrl: image_(option, questionId + '-' + optionId) };
       });
       const correctOptionId = String(question.correctOptionId || '');
       if (!optionIds[correctOptionId]) throw new Error('Marca una respuesta correcta para cada pregunta.');
@@ -244,7 +258,7 @@ function saveTemplateActivity_(body, id, title) {
       const words = text.split(/\\s+/).filter(Boolean);
       if (words.length < 2 || words.length > 50) throw new Error('Cada oración debe contener entre 2 y 50 palabras.');
       const wordStyles = Array.isArray(sentence.wordStyles) ? sentence.wordStyles : [];
-      return { id: sentenceId, text: text, wordStyles: words.map(function(word, index) { const style = wordStyles[index] || {}; return { bold: style.bold === true, italic: style.italic === true, underline: style.underline === true }; }), words: words.map(function(word, index) { const style = wordStyles[index] || {}; return { id: sentenceId + '-palabra-' + index, text: word, order: index, bold: style.bold === true, italic: style.italic === true, underline: style.underline === true }; }) };
+      return { id: sentenceId, text: text, imageUrl: image_(sentence, sentenceId), wordStyles: words.map(function(word, index) { const style = wordStyles[index] || {}; return { bold: style.bold === true, italic: style.italic === true, underline: style.underline === true }; }), words: words.map(function(word, index) { const style = wordStyles[index] || {}; return { id: sentenceId + '-palabra-' + index, text: word, order: index, bold: style.bold === true, italic: style.italic === true, underline: style.underline === true }; }) };
     });
   } else if (kind === 'flashcards' || kind === 'memory') {
     if (!Array.isArray(body.pairs) || body.pairs.length < 2 || body.pairs.length > 30) throw new Error('Agrega entre 2 y 30 tarjetas.');
