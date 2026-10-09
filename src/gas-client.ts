@@ -369,3 +369,14 @@ export async function supportsActivityKind(kind: string) {
     return result.ok && Array.isArray(data.kinds) && data.kinds.includes(kind);
   } catch { return false; }
 }
+
+export async function saveActivityAvailability(key: string, activity: Pick<Activity, "id" | "availableFrom" | "availableUntil">) {
+  const response = await apiRequest("/api/teacher/activity-deadline", {
+    method: "POST",
+    headers: { "x-teacher-key": key },
+    body: JSON.stringify({ id: activity.id, availableFrom: activity.availableFrom || null, availableUntil: activity.availableUntil || null }),
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || "No se pudieron guardar las fechas de la actividad.");
+  return data as { availableFrom: string | null; availableUntil: string | null };
+}

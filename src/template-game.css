@@ -21,3 +21,20 @@
 .tg-boolean-options>label{display:flex!important;align-items:center;gap:9px!important;min-height:48px}
 .tg-boolean-options input{width:auto;min-height:auto;accent-color:#4c8a65}
 @media(max-width:680px){.tg-options{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.tg-shell{width:min(1180px,100%);padding:clamp(14px,2.2vw,24px)}
+.tg-title{margin-bottom:9px}.tg-title h1{font-size:clamp(23px,3vw,29px);margin:2px 0}
+.tg-form{gap:10px}.tg-quiz-question-row{gap:8px;padding:11px;background:#f7f7f6}
+.tg-quiz-question-row>label{gap:5px;font-size:13px}.tg-quiz-question-row>label input:not([type=file]){min-height:40px;padding:8px 10px}
+.tg-quiz-question-row>label input[type=file]{padding:6px;font-size:12px}
+.tg-quiz-question-row .tg-options{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.tg-quiz-question-row .tg-options>.tg-quiz-option{display:grid;grid-template-columns:26px minmax(0,1fr) 30px;gap:8px;align-items:center;padding:7px 9px;min-width:0;border:1px solid #dce4dc;border-radius:9px;background:#fff}
+.tg-quiz-question-row .tg-option-letter{display:grid;place-items:center;width:25px;height:25px;border-radius:50%;background:#eef3ee;color:#3d5c47;font-weight:800}
+.tg-quiz-question-row .tg-options input:not([type=radio]){min-width:0;min-height:38px;padding:7px 9px}
+.tg-quiz-question-row .tg-correct-mark{display:grid;place-items:center;width:28px;height:28px;min-height:28px;padding:0;border:0;border-radius:50%;font-size:19px;line-height:1;font-weight:900}
+.tg-quiz-question-row .tg-correct-mark.is-correct{background:#16843d;color:#fff}
+.tg-quiz-question-row .tg-correct-mark.is-incorrect{background:#c93636;color:#fff}
+.tg-quiz-question-row>header button{min-height:30px;padding:4px 9px;font-size:12px}
+.activity-answer-key{margin:18px auto;padding:15px;border:1px solid #dce7df;border-radius:14px;background:#f7faf7;text-align:left}
+.activity-answer-key h2{margin:0 0 10px;font-size:20px}.activity-answer-key ol{margin:0;padding-left:24px;display:grid;gap:7px}
+.game-focus-blurred .pair-board{filter:blur(14px);pointer-events:none;user-select:none}
+@media(max-width:680px){.tg-quiz-question-row .tg-options{grid-template-columns:1fr}.tg-quiz-question-row{padding:9px}.tg-shell{padding:13px}}

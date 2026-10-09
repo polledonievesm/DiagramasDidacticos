@@ -31,6 +31,11 @@ export type Activity = {
   crosswordClues?: CrosswordClue[];
   assignedStudentIds?: string[];
   shuffle?: boolean;
+  shuffleQuestions?: boolean;
+  shuffleAnswers?: boolean;
+  showAnswersAtEnd?: boolean;
+  showLeaderboard?: boolean;
+  blurWhenInactive?: boolean;
   sound?: boolean;
   scoring?: boolean;
   id: string;
