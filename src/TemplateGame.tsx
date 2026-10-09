@@ -70,10 +70,14 @@ export default function TemplateGame({kind}:Props){
    const key=getTeacherKey();
    if(!key){setScreen("teacher-key");return}
    setTeacherKey(key);
+   const savedId=q.get("actividad");
+   if(!savedId&&q.get("nueva")==="1"){
+    const fresh=blank(kind);setDraft(fresh);setActivity(fresh);setScreen("teacher");
+    void supportsActivityKind(kind).then(supported=>{if(!supported){setNotice("El editor está listo, pero Apps Script necesita actualizarse para guardar esta plantilla.");return}return getTeacherActivities(key)}).catch(e=>setNotice(e instanceof Error?e.message:"No se pudo actualizar la lista de actividades."));
+    return;
+   }
    void supportsActivityKind(kind).then(supported=>{if(!supported){setNotice("Para activar esta plantilla, actualiza el Apps Script existente desde el archivo Code.gs del proyecto.");setScreen("unsupported");return false}return true}).then(supported=>supported?getTeacherActivities(key):null).then(async result=>{if(!result)return;
-    const savedId=q.get("actividad");
     if(savedId)await loadSaved(savedId);
-    else if(q.get("nueva")==="1"){const fresh=blank(kind);setDraft(fresh);setActivity(fresh)}
     setScreen("teacher")
    }).catch(e=>{setNotice(e instanceof Error?e.message:"No se pudo cargar el editor.");setScreen("teacher-error")});
    return;

@@ -26,8 +26,11 @@ export default function ActivitySettings({ value, onChange, title = "Configuraci
 }) {
   const patch = (updates: Partial<Activity>) => onChange(current => ({ ...current, ...updates }));
   const fallbackShuffle = value.shuffle !== false;
-  return <section className="shared-settings">
-    <h2>{title}</h2>
+  const selectedField = fields.find(field => field.value === value.fieldFormative)?.label || "Campo formativo sin seleccionar";
+  const clockLabel = value.timerMode === "down" ? "Cuenta regresiva" : value.timerMode === "up" ? "Cronómetro" : "Sin límite de tiempo";
+  return <details className="shared-settings">
+    <summary><strong>{title}</strong><span>{selectedField} · {clockLabel}</span></summary>
+    <div className="shared-settings-content">
     <div className="shared-settings-grid">
       <label>Campo formativo<select value={value.fieldFormative || ""} onChange={event => patch({ fieldFormative: event.target.value as FormativeField | "" })}>
         <option value="">Selecciona un campo formativo</option>{fields.map(field => <option key={field.value} value={field.value}>{field.label}</option>)}
@@ -53,5 +56,6 @@ export default function ActivitySettings({ value, onChange, title = "Configuraci
       </fieldset>
     </div>
     <p className="shared-settings-note">La actividad se guarda como borrador. Asígnala o actívala para tus alumnos desde <b>Mis actividades</b>.</p>
-  </section>;
+    </div>
+  </details>;
 }
