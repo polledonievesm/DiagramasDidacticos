@@ -204,8 +204,9 @@ export default function Home() {
       const response = await apiRequest("/api/submit", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ activityId: activity.id, ...student, studentToken, placements, elapsedSeconds: elapsed, remainingSeconds: activity.timerMode === "down" ? Math.max(0, activity.timeLimitSeconds - elapsed) : null, timedOut }) });
       const data = await response.json(); if (!response.ok) throw new Error(data.error || "No se pudo guardar el resultado.");
       setResult(data); setScreen("result"); sound(timedOut ? "timeout" : "finish");
-      const ranking = await apiRequest(`/api/leaderboard?activityId=${encodeURIComponent(activity.id)}`);
-      if (ranking.ok) setLeaderboard(await ranking.json() as Leader[]);
+      if (activity.showLeaderboard) void apiRequest(`/api/leaderboard?activityId=${encodeURIComponent(activity.id)}`)
+        .then(async ranking => { if (ranking.ok) setLeaderboard(await ranking.json() as Leader[]); })
+        .catch(() => {});
     } catch (e) { setNotice(e instanceof Error ? e.message : "No se pudo guardar el resultado."); }
     finally { setBusy(false); }
   }

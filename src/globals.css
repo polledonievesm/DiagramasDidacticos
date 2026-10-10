@@ -203,3 +203,37 @@ a.catalog-card:hover{transform:translateY(-3px);border-color:#b8cec0;box-shadow:
 .pair-content-row,.pair-table-head{grid-template-columns:36px minmax(0,455px) minmax(0,455px) 100px}
 @media(max-width:760px){.pair-content-row,.pair-table-head{grid-template-columns:30px minmax(0,1fr) minmax(0,1fr)}.pair-content-row>.editor-row-actions{grid-column:2/4;grid-row:2;justify-content:flex-end}.pair-table-head button{grid-column:2/4}.pair-content-cell{min-height:48px;height:48px}.pair-content-cell input:not([type=file]){height:46px;min-height:46px;font-size:14px;padding:6px!important}}
 .password-field{position:relative;display:block;width:100%}.password-field input{padding-right:48px!important}.password-visibility-toggle{position:absolute;right:8px;top:50%;display:grid;place-items:center;width:34px;height:34px;padding:0;transform:translateY(-50%);border:0;border-radius:8px;background:transparent;color:#647b70;cursor:pointer}.password-visibility-toggle:hover{background:#eaf2ec;color:#315f48}.password-visibility-toggle:focus-visible{outline:2px solid #5e9b78;outline-offset:1px}.password-visibility-toggle svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+
+/* Une su pareja: banco de tarjetas y casillas de respuesta como la referencia. */
+.pair-play-page{background:#fff;color:#17191b;padding-bottom:26px}
+.pair-playbar{min-height:54px;padding:9px clamp(14px,3vw,38px);background:#fff;border-bottom:1px solid #e5e5e5;color:#34383a}
+.pair-play-title{margin:14px auto 20px;padding:0 16px;text-align:center}
+.pair-play-title .pair-kicker{color:#5486a1;font-size:11px}
+.pair-play-title h1{margin:4px 0 7px;color:#20252a;font-size:clamp(24px,3vw,34px);letter-spacing:-.025em}
+.pair-play-title p{margin:0;color:#45494c;font-size:15px}
+.pair-board{width:min(1680px,calc(100% - 36px));margin:0 auto;display:grid;grid-template-columns:minmax(340px,.82fr) minmax(0,1.75fr);gap:24px;align-items:start}
+.pair-source-bank{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;padding:11px;border:1px solid #aaa;border-radius:4px;background:#fff}
+.pair-source-tile{min-width:0;min-height:clamp(100px,12vh,145px);padding:8px 7px 10px;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:6px;border:3px solid transparent;border-radius:4px;color:#fff;text-align:center;font-size:clamp(16px,1.5vw,25px);line-height:1.15;font-weight:650;box-shadow:inset 0 0 0 1px #ffffff35,0 2px 3px #00000020;cursor:grab;touch-action:manipulation;transition:filter .15s,transform .15s,box-shadow .15s}
+.pair-source-tile:nth-child(8n+1){background:#22a6e9;border-color:#37bbfa}.pair-source-tile:nth-child(8n+2){background:#2638d7;border-color:#3b4fec}.pair-source-tile:nth-child(8n+3){background:#df1836;border-color:#f33c55}.pair-source-tile:nth-child(8n+4){background:#25ae78;border-color:#45d39b}.pair-source-tile:nth-child(8n+5){background:#ff790d;border-color:#ff973b}.pair-source-tile:nth-child(8n+6){background:#e9370d;border-color:#ff5c30}.pair-source-tile:nth-child(8n+7){background:#16854e;border-color:#31aa6c}.pair-source-tile:nth-child(8n){background:#7c22dd;border-color:#9c48f4}
+.pair-source-tile:hover,.pair-source-tile:focus-visible{filter:brightness(1.08);transform:translateY(-2px);outline:3px solid #1113;outline-offset:1px}
+.pair-source-tile.chosen{outline:4px solid #252525;outline-offset:1px;transform:scale(1.025);z-index:1}
+.pair-source-tile.connected{filter:saturate(.72);box-shadow:inset 0 0 0 3px #fff8,0 2px 3px #0002}
+.pair-source-tile .pair-side-image{max-width:min(100%,190px);max-height:clamp(48px,7vh,82px);object-fit:contain;border-radius:2px;background:#fff}
+.pair-source-tile span{display:block;overflow-wrap:anywhere}
+.pair-target-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:20px;row-gap:10px;align-items:stretch}
+.pair-target-row{min-width:0;min-height:clamp(82px,10vh,116px);display:grid;grid-template-columns:minmax(96px,38%) minmax(0,1fr);gap:11px;align-items:center}
+.pair-dropzone{width:100%;height:100%;min-height:78px;padding:6px;display:grid;place-items:center;border:1px solid #aaa;border-radius:2px;background:#fff;color:#333;cursor:pointer;transition:border-color .15s,background .15s,box-shadow .15s}
+.pair-dropzone.ready{border-color:#299ed3;background:#f5fbff}
+.pair-dropzone:hover,.pair-dropzone:focus-visible{border-color:#298fbd;box-shadow:0 0 0 2px #42afe533;outline:0}
+.pair-dropzone.filled{border:2px solid #318fc1;background:#f4faff}
+.pair-dropzone .pair-side-image{max-width:100%;max-height:76px;object-fit:contain}
+.pair-dropzone>span{font-size:12px;color:#2987ad}
+.pair-target-description{min-width:0;display:flex;align-items:center;color:#17191b;font-size:clamp(16px,1.45vw,23px);font-weight:500;line-height:1.23;overflow-wrap:anywhere}
+.pair-target-description .pair-side-image{max-width:100%;max-height:90px;object-fit:contain}
+.pair-play-actions{width:min(1680px,calc(100% - 36px));margin:14px auto 0;padding:0;color:#57636a}
+.pair-play-actions .pair-primary{min-width:210px;border:1px solid #888;border-radius:4px;background:#fff;color:#272b2d;padding:10px 20px;font-size:17px;font-weight:500}
+.pair-play-actions .pair-primary:hover:not(:disabled){background:#f4f4f4}
+.pair-play-page>.pair-error{width:min(1680px,calc(100% - 36px));margin:8px auto}
+@media(max-width:1050px){.pair-board{grid-template-columns:minmax(280px,.8fr) minmax(0,1.4fr);gap:14px}.pair-target-grid{grid-template-columns:1fr}.pair-target-row{min-height:84px}.pair-source-tile{min-height:100px}}
+@media(max-width:700px){.pair-play-title{margin:12px auto 16px}.pair-play-title p{font-size:14px}.pair-board{width:calc(100% - 20px);grid-template-columns:1fr;gap:14px}.pair-source-bank{grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;padding:8px}.pair-source-tile{min-height:88px;font-size:16px}.pair-source-tile .pair-side-image{max-height:54px}.pair-target-grid{grid-template-columns:1fr;gap:7px}.pair-target-row{grid-template-columns:minmax(84px,31%) minmax(0,1fr);min-height:76px;gap:10px}.pair-dropzone{min-height:68px}.pair-target-description{font-size:16px}.pair-play-actions{width:calc(100% - 20px);flex-direction:row;align-items:center}.pair-play-actions .pair-primary{min-width:0;padding:11px 13px;font-size:15px}}
+@media(max-width:390px){.pair-playbar{font-size:12px;padding:9px 10px}.pair-source-bank{gap:5px;padding:6px}.pair-source-tile{min-height:78px;font-size:14px}.pair-target-row{grid-template-columns:78px minmax(0,1fr);gap:8px}.pair-target-description{font-size:14px}.pair-play-actions{font-size:12px}.pair-play-actions .pair-primary{font-size:14px}}

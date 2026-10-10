@@ -373,7 +373,7 @@ export async function apiRequest(path: string, init: RequestInit = {}) {
       const submitted = Array.isArray(answers.order) ? answers.order.map(String) : [];
       correct = [...(activity.steps || [])].sort((a, b) => a.order - b.order).filter((step, index) => submitted[index] === step.id).length;
     } else if (activity.kind === "complete-sentence" || activity.kind === "complete-phrase") {
-      const normalizeAnswer = (value: unknown) => String(value || "").trim().toLocaleLowerCase("es-MX").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\\s+/g, " ");
+      const normalizeAnswer = (value: unknown) => String(value || "").trim().toLocaleLowerCase("es-MX").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, " ");
       correct = (activity.sentences || []).filter((sentence) => normalizeAnswer(answers[sentence.id]) === normalizeAnswer(sentence.answer)).length;
     } else if (activity.kind === "word-order") {
       (activity.wordSentences || []).forEach((sentence) => {

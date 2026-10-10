@@ -156,8 +156,8 @@ export default function TemplateGame({kind}:Props){
    const response=await apiRequest("/api/submit",{method:"POST",body:JSON.stringify({activityId:activity.id,studentToken,paternalSurname:student!.paternalSurname,maternalSurname:student!.maternalSurname,givenNames:student!.givenNames,answers:answerPayload,elapsedSeconds:seconds,remainingSeconds:activity.timerMode==="down"?Math.max(0,activity.timeLimitSeconds-seconds):null,timedOut:expired||timedOut})}),data=await response.json();
    if(!response.ok)throw Error(data.error||"No se pudo guardar el resultado.");
    setScore(data);setAttempts(data.attemptsRemaining===null?null:Number(data.attemptsRemaining));
-   if(activity.showLeaderboard){const board=await apiRequest("/api/leaderboard?activityId="+encodeURIComponent(activity.id));if(board.ok)setLeaderboard(await board.json() as LeaderboardRow[])}
    setScreen("result");
+   if(activity.showLeaderboard)void apiRequest("/api/leaderboard?activityId="+encodeURIComponent(activity.id)).then(async board=>{if(board.ok)setLeaderboard(await board.json() as LeaderboardRow[])}).catch(()=>{});
    if(activity.sound!==false&&!muted)beep();
   }catch(e){setNotice(e instanceof Error?e.message:"No se pudo calificar.");setTimedOut(false)}
   finally{setBusy(false)}
