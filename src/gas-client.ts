@@ -6,12 +6,16 @@ let cachedActivity: Activity | null = null;
 const teacherKeyNames = ["platformTeacherKey", "pairTeacherKey", "diagramTeacherKey"] as const;
 const TEACHER_USERNAME_KEY = "aulaTeacherUsername";
 const STUDENT_SESSION_KEY = "aulaStudentSessionV1";
+const STUDENT_SESSION_CLOSED_KEY = "aulaStudentSessionClosedV1";
 const SESSION_ROLE_KEY = "aulaSessionRoleV1";
 const SESSION_CHANGED_EVENT = "aula-session-change";
 export type StudentSessionProfile = { id:string; name?:string; givenNames:string; paternalSurname:string; maternalSurname:string; username:string };
 
 export function getStudentSession() {
   try {
+    // A logout in another tab must not resurrect the old session from this
+    // tab's sessionStorage fallback after localStorage has been cleared.
+    try { if (localStorage.getItem(STUDENT_SESSION_CLOSED_KEY) === "1") return null; } catch { /* Use the per-tab copy if persistent storage is blocked. */ }
     let stored = "";
     try { stored = localStorage.getItem(STUDENT_SESSION_KEY) || ""; } catch { /* Sigue con la sesión de esta pestaña. */ }
     if (!stored) stored = sessionStorage.getItem(STUDENT_SESSION_KEY) || "";
@@ -24,12 +28,14 @@ export function getStudentSession() {
 export function saveStudentSession(token: string, student: StudentSessionProfile) {
   const normalized = { ...student, givenNames: student.givenNames || student.name || "" };
   const value = JSON.stringify({ token, student: normalized });
+  try { localStorage.removeItem(STUDENT_SESSION_CLOSED_KEY); } catch {}
   try { localStorage.setItem(STUDENT_SESSION_KEY, value); } catch { /* La sesión de pestaña sigue disponible. */ }
   try { sessionStorage.setItem(STUDENT_SESSION_KEY, value); } catch { /* El inicio permanece válido aunque la pestaña bloquee almacenamiento. */ }
   try { localStorage.setItem(SESSION_ROLE_KEY, "student"); } catch { /* La sesión permanece válida aunque el navegador limite el almacenamiento. */ }
   window.dispatchEvent(new Event(SESSION_CHANGED_EVENT));
 }
 export function clearStudentSession() {
+  try { localStorage.setItem(STUDENT_SESSION_CLOSED_KEY, "1"); } catch {}
   try { localStorage.removeItem(STUDENT_SESSION_KEY); } catch {}
   try { sessionStorage.removeItem(STUDENT_SESSION_KEY); } catch {}
   try {
@@ -158,8 +164,31 @@ async function send(payload: Record<string, unknown>) {
   });
 }
 
+function normalizeDriveImageUrl(value: string): string {
+  if (!value || !/drive\.google\.com/i.test(value)) return value;
+  try {
+    const url = new URL(value);
+    const filePath = url.pathname.match(/\/file\/d\/([^/]+)/);
+    const id = url.searchParams.get("id") || filePath?.[1] || "";
+    return id ? `https://drive.google.com/thumbnail?id=${encodeURIComponent(id)}&sz=w1600` : value;
+  } catch { return value; }
+}
+
+function normalizeImageFields(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(normalizeImageFields);
+  if (!value || typeof value !== "object") return value;
+  const result: Record<string, unknown> = {};
+  for (const [key, item] of Object.entries(value as Record<string, unknown>)) {
+    result[key] = typeof item === "string" && /(?:image|cover).*url/i.test(key)
+      ? normalizeDriveImageUrl(item)
+      : normalizeImageFields(item);
+  }
+  return result;
+}
+
 function response(data: ApiResult, status = 200) {
-  return { ok: status >= 200 && status < 300, status, json: async (): Promise<any> => data };
+  const normalized = normalizeImageFields(data);
+  return { ok: status >= 200 && status < 300, status, json: async (): Promise<any> => normalized };
 }
 
 export async function apiRequest(path: string, init: RequestInit = {}) {

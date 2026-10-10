@@ -11,6 +11,7 @@ import EditorItemActions from "./EditorItemActions";
 import EditorWorkflow from "./EditorWorkflow";
 import "./template-game.css";
 import PasswordField from "./PasswordField";
+import { imageFileToDataUrl } from "./image-utils";
 
 type Student = { paternalSurname:string; maternalSurname:string; givenNames:string };
 type QuizKind = "quiz" | "quiz-show" | "true-false";
@@ -28,7 +29,7 @@ const blank=(kind:Props["kind"]):Activity=>({
 });
 const fmt=(value:number)=>{const n=Math.max(0,Math.floor(value));return Math.floor(n/60)+":"+String(n%60).padStart(2,"0")};
 function randomize<T>(items:T[]){const copy=[...items];for(let i=copy.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[copy[i],copy[j]]=[copy[j],copy[i]]}return copy}
-function readImage(file?:File){return new Promise<string>((resolve,reject)=>{if(!file)return resolve("");if(file.size>5*1024*1024)return reject(Error("La imagen debe pesar menos de 5 MB."));if(!/^image\/(png|jpeg|webp)$/.test(file.type))return reject(Error("Usa una imagen PNG, JPG o WebP."));const reader=new FileReader();reader.onload=()=>resolve(String(reader.result));reader.onerror=()=>reject(Error("No se pudo leer la imagen."));reader.readAsDataURL(file)})}
+function readImage(file?:File){return imageFileToDataUrl(file)}
 
 export default function TemplateGame({kind}:Props){
  const previewMode=new URLSearchParams(location.search).get("vista")==="docente";
@@ -116,8 +117,9 @@ export default function TemplateGame({kind}:Props){
    if(kind==="sequence"&&((payload.steps?.length||0)<2||payload.steps?.some(step=>!step.text.trim())))throw Error("Escribe al menos dos pasos.");
    const response=await apiRequest("/api/teacher/activity",{method:"POST",headers:{"x-teacher-key":teacherKey},body:JSON.stringify(payload)}),data=await response.json();
    if(!response.ok)throw Error(data.error||"No se pudo guardar.");
+   setActivity({...data,availableFrom:payload.availableFrom||null,availableUntil:payload.availableUntil||null});setDraft({...data,availableFrom:payload.availableFrom||null,availableUntil:payload.availableUntil||null});
    await saveActivityAvailability(teacherKey,payload);
-   setActivity({...data,availableFrom:payload.availableFrom||null,availableUntil:payload.availableUntil||null});setDraft(data);await getTeacherActivities(teacherKey);setNotice("Actividad guardada. Ya puedes compartir su enlace.");
+   window.location.assign("?panel=actividades");
   }catch(e){setNotice(e instanceof Error?e.message:"No se pudo guardar la actividad.")}
   finally{setBusy(false)}
  }
@@ -132,7 +134,7 @@ export default function TemplateGame({kind}:Props){
    if(isQuestionGame)setPlayQuestions((shuffleQuestions?randomize(activity.questions||[]):[...(activity.questions||[])]).map(q=>({...q,options:shuffleAnswers?randomize(q.options):[...q.options]})));
    if(kind==="group-sort")setPlayItems(shuffleQuestions?randomize(activity.items||[]):[...(activity.items||[])]);
    if(kind==="sequence")setOrder(shuffleQuestions?randomize(activity.steps||[]):[...(activity.steps||[])]);
-   setScreen(kind==="quiz-show"?"contest-intro":"play");
+   setScreen(kind==="quiz-show"&&!previewMode?"contest-intro":"play");
   }catch(e){setNotice(e instanceof Error?e.message:"No se pudo iniciar.")}
   finally{setBusy(false)}
  }
@@ -161,6 +163,7 @@ export default function TemplateGame({kind}:Props){
   finally{setBusy(false)}
  }
  useEffect(()=>{if(timedOut&&screen==="play")void finish(true)},[timedOut]);
+ useEffect(()=>{if(previewMode&&screen==="login"&&activity.id)void start()},[previewMode,screen,activity.id]);
  function beep(){try{const ctx=new AudioContext(),osc=ctx.createOscillator(),gain=ctx.createGain();osc.frequency.value=660;gain.gain.value=.04;osc.connect(gain);gain.connect(ctx.destination);osc.start();osc.stop(ctx.currentTime+.22);osc.onended=()=>void ctx.close()}catch{}}
  function moveStep(index:number,offset:number){const next=[...order],to=index+offset;if(to<0||to>=next.length)return;[next[index],next[to]]=[next[to],next[index]];setOrder(next)}
  function moveList<T>(list:T[],index:number,offset:number){const next=[...list],to=index+offset;if(to<0||to>=next.length)return next;[next[index],next[to]]=[next[to],next[index]];return next}

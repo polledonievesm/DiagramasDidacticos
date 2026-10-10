@@ -62,6 +62,7 @@ function safeHtml(value: string) { return value.replace(/[&<>"']/g, (ch) => ({ "
 export default function Home() {
   const previewMode = new URLSearchParams(window.location.search).get("vista") === "docente";
   const [activity, setActivity] = useState<Activity>(defaultActivity);
+  const [activityLoaded, setActivityLoaded] = useState(false);
   const [screen, setScreen] = useState<Screen>("catalog");
   const [student, setStudent] = useState(() => { const saved=getStudentSession()?.student; return saved ? { paternalSurname:saved.paternalSurname, maternalSurname:saved.maternalSurname, givenNames:saved.givenNames } : emptyStudent; });
   const [studentToken, setStudentToken] = useState(() => getStudentSession()?.token || "");
@@ -132,8 +133,10 @@ export default function Home() {
       if (!response.ok) throw new Error("No se encontró la actividad.");
       const data = await response.json() as Activity;
       setActivity(data); setEditing(data); setPlacements({}); setNotice("");
+      if (previewMode) { setLeaderboard([]); setActivityLoaded(true); return; }
       const ranking = await apiRequest(`/api/leaderboard?activityId=${encodeURIComponent(id)}`);
       if (ranking.ok) setLeaderboard(await ranking.json() as Leader[]);
+      setActivityLoaded(true);
     } catch (e) { setNotice(e instanceof Error ? e.message : "No se pudo cargar la actividad."); }
   }, []);
 
@@ -145,6 +148,10 @@ export default function Home() {
     setScreen("intro");
     void loadActivity(activityId);
   }, [loadActivity]);
+
+  useEffect(() => {
+    if (previewMode && activityLoaded && screen === "intro") void startGame();
+  }, [previewMode, activityLoaded, screen]);
 
   useEffect(() => { if (teacherUnlocked && modeTab === "students") void loadStudents(); }, [teacherUnlocked, modeTab]);
 
@@ -408,12 +415,11 @@ export default function Home() {
     try {
       const response = await apiRequest("/api/teacher/activity", { method: "POST", headers: { "Content-Type": "application/json", "x-teacher-key": teacherKey }, body: JSON.stringify({ ...editing, id: editing.id || `${slug(editing.title)}-${Date.now()}`, imageData: imageDraft }) });
       const data = await response.json(); if (!response.ok) throw new Error(data.error || "No se pudo guardar.");
-      await saveActivityAvailability(teacherKey,{...editing,id:data.id});
       const savedData={...data,availableFrom:editing.availableFrom||null,availableUntil:editing.availableUntil||null};
       setEditing(savedData); setActivity(savedData); setActivities((old) => [savedData, ...old.filter((a) => a.id !== savedData.id)]);
       setImageDraft(null);
-      const url = new URL(window.location.href); url.search = `?actividad=${encodeURIComponent(data.id)}`; setShareLink(url.toString()); setCopied(false);
-      setNotice("Actividad guardada. Ya puedes copiar el enlace para tus alumnos.");
+      await saveActivityAvailability(teacherKey,{...editing,id:data.id});
+      window.location.assign("?panel=actividades");
     } catch (e) { setNotice(e instanceof Error ? e.message : "No se pudo guardar la actividad."); }
     finally { setBusy(false); }
   }
