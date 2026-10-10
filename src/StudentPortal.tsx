@@ -65,6 +65,9 @@ export default function StudentPortal() {
       const error=Object.assign(new Error(data.error||"No se pudo abrir el portal del alumno."),{status:response.status});
       throw error;
     }
+    // A pending Apps Script response must not restore a session after the
+    // learner has signed out (or switched accounts in another tab).
+    if(getStudentSession()?.token!==token) return;
     const enriched=data as PortalData;
     enriched.activities=enriched.activities.map(item=>({...item,fieldFormative:fieldFromCover(item.imageUrl)}));
     setPortal(enriched);
@@ -105,17 +108,24 @@ export default function StudentPortal() {
     } catch(error) { setNotice(error instanceof Error?error.message:"No se pudo iniciar sesión."); }
     finally { setBusy(false); }
   }
-  function signOut() { clearStudentSession(); window.location.replace("?panel=inicio"); }
+
+  function signOut() {
+    clearStudentSession();
+    // Return to the public role selector. Keeping ?panel=alumno here would
+    // leave the learner on the student-only login screen after signing out.
+    window.location.replace("?panel=inicio");
+  }
 
   async function retrySession() {
     if(!session?.token) return;
     setCheckingSession(true); setNotice("");
     try { await load(session.token); }
     catch(error) {
+      if(getStudentSession()?.token!==session.token) return;
       const expired=typeof error==="object"&&error!==null&&"status" in error&&Number((error as {status:unknown}).status)===401;
       if(expired) { clearStudentSession(); setSession(null); }
       setNotice(error instanceof Error?error.message:"No se pudo abrir el portal del alumno.");
-    } finally { setCheckingSession(false); }
+    } finally { if(getStudentSession()?.token===session.token) setCheckingSession(false); }
   }
 
   if(!portal&&session?.token) return (

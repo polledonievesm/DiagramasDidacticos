@@ -14,12 +14,12 @@ import { getSessionRole, sessionChangedEventName } from "./gas-client";
 import "./globals.css";
 import "./redesign.css";
 
-const query = new URLSearchParams(window.location.search);
-const game = query.get("juego") || "";
-const generic = ["quiz", "quiz-show", "true-false", "group-sort", "sequence"].includes(game);
-const cards = ["flashcards", "memory"].includes(game);
-const textGames = ["complete-sentence", "word-order"].includes(game);
-const extraGames = ["roulette", "word-search", "complete-phrase"].includes(game);
+const query=new URLSearchParams(window.location.search);
+const game=query.get("juego")||"";
+const generic=["quiz","quiz-show","true-false","group-sort","sequence"].includes(game);
+const cards=["flashcards","memory"].includes(game);
+const textGames=["complete-sentence","word-order"].includes(game);
+const extraGames=["roulette","word-search","complete-phrase"].includes(game);
 
 function SessionEntry() {
   const [role, setRole] = useState(getSessionRole);
