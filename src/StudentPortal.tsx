@@ -105,8 +105,7 @@ export default function StudentPortal() {
     } catch(error) { setNotice(error instanceof Error?error.message:"No se pudo iniciar sesión."); }
     finally { setBusy(false); }
   }
-
-  function signOut() { clearStudentSession();setSession(null);setPortal(null);setCheckingSession(false);setNotice(""); }
+  function signOut() { clearStudentSession(); window.location.replace("?panel=inicio"); }
 
   async function retrySession() {
     if(!session?.token) return;
