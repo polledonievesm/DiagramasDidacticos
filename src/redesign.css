@@ -205,3 +205,21 @@
 .tg-sequence-text { display:block!important; grid-column:1!important; }
 .tg-sequence-text .tg-field-with-image { width:100%; }
 @media(max-width:680px){.tg-sequence-text{grid-column:1/-1!important}}
+
+/* Legacy teacher roster/results panel follows the same calm blue palette. */
+.teacher-page{background:radial-gradient(ellipse at 8% 2%,#dceffa 0,transparent 36%),#edf5fa;color:#24384a}
+.teacher-topbar{border-color:#d8e7f0;background:rgba(247,251,254,.97);box-shadow:0 4px 16px rgba(34,91,126,.08)}
+.teacher-topbar .brand-mark{background:#2184cf;color:#fff}
+.teacher-nav a,.teacher-nav button{color:#526d81}
+.teacher-nav a.active,.teacher-nav button.active{border-bottom-color:#2ba7df;color:#176f9e}
+.teacher-nav a:hover,.teacher-nav button:hover{background:#eaf4fa;color:#176f9e}
+.teacher-page .access-card,.teacher-page .account-section,.teacher-page .editor-main,.teacher-page .editor-preview,.teacher-page .results-section{border-color:#d8e7f0;background:#fff;box-shadow:0 8px 26px rgba(34,91,126,.08)}
+.teacher-page .primary{background:#2184cf;box-shadow:0 6px 15px rgba(33,132,207,.16)}
+.teacher-page .primary:hover{background:#176fae}
+.teacher-page .secondary{border-color:#d3e3ed;background:#f4f9fc;color:#315c78}
+.teacher-page .student-bulkbar,.teacher-page .roster-import[open]{border-color:#d8e7f0;background:#f5fafe}
+.teacher-page .student-password{background:#eef7fc}
+.teacher-page .student-card-grid .student-account-card{border-color:#d8e7f0;background:#fff;box-shadow:0 4px 15px rgba(34,91,126,.07)}
+.teacher-page .account-section .roster-import{border-color:#d8e7f0;background:#f5fafe}
+.teacher-page .account-section .roster-import>summary{color:#267da9}
+.teacher-page .account-section .roster-toolbar input,.teacher-page .account-section .roster-toolbar select{border-color:#d4e2eb;color:#31536b}
