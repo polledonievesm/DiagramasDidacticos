@@ -8,6 +8,7 @@ import templateIllustrations from "./assets/plantillas-ilustradas.webp";
 import { coverWithField, fieldFromCover } from "./formative-field";
 import "./activity-manager.css";
 import PasswordField from "./PasswordField";
+import ActivityLeaderboard, { type LeaderboardRow } from "./ActivityLeaderboard";
 
 function editorUrl(activity?: Activity, templateId = "diagram-labels", duplicate = false) {
   const url = new URL(window.location.href);
@@ -127,6 +128,8 @@ export default function ActivityManager() {
   const [students, setStudents] = useState<StudentRow[]>(() => initialReportCache?.students || []);
   const [reportLoadState, setReportLoadState] = useState<"loading" | "ready" | "error">(() => initialReportCache ? "ready" : "loading");
   const [reportActivityId, setReportActivityId] = useState(query.get("actividad") || "");
+  const [reportTab, setReportTab] = useState<"completed" | "pending" | "ranking">("completed");
+  const [reopeningStudent, setReopeningStudent] = useState("");
   const [selectedField, setSelectedField] = useState(query.get("campo") || "");
   const [accountOpen, setAccountOpen] = useState(false);
   const [supportedKinds, setSupportedKinds] = useState<string[]>(() => initialCache?.supportedKinds || ["diagram","pairs"]);
@@ -421,6 +424,9 @@ export default function ActivityManager() {
   const selectedFormative = formativeFields.find(field => field.id === selectedField);
   const fieldActivities = activities.filter(activity => selectedField === "sin-asignar" ? !activity.fieldFormative : (activity.fieldFormative || "") === selectedField);
   const currentReport = activities.find(activity => activity.id === reportActivityId);
+  const currentReportRows = reportActivityId ? reportRowsForActivity(reportActivityId) : [];
+  const reportLeaderboard: LeaderboardRow[] = currentReportRows.filter(item=>item.best).sort((a,b)=>Number(b.best?.grade||0)-Number(a.best?.grade||0)||Number(b.best?.correct||0)-Number(a.best?.correct||0)||Number(a.best?.elapsed_seconds??Infinity)-Number(b.best?.elapsed_seconds??Infinity)).slice(0,35).map((item,index)=>({rank:index+1,name:String(item.student.given_names||"").trim().split(/\s+/)[0]||"Alumno",paternalSurname:String(item.student.paternal_surname||""),grade:Number(item.best?.grade||0),attempts:item.attempts.length}));
+  const visibleReportRows = currentReportRows.filter(item=>reportTab==="completed"?Boolean(item.best):reportTab==="pending"?!item.best:false);
   useEffect(() => {
     if (view === "results" && reportActivityId && !selectedField && activities.length) {
       const report = activities.find(item => item.id === reportActivityId);
@@ -435,6 +441,7 @@ export default function ActivityManager() {
   }
   function selectReport(activityId: string) {
     setReportActivityId(activityId);
+    setReportTab("completed");
     const url = new URL(window.location.href);
     if (activityId) url.searchParams.set("actividad", activityId); else url.searchParams.delete("actividad");
     window.history.replaceState(null, "", url);
@@ -452,7 +459,9 @@ export default function ActivityManager() {
     return { average: values.length ? values.reduce((sum,value)=>sum+value,0)/values.length : null, grades: values.length };
   }
   function reportRoster(activityId: string) {
-    const roster = students.filter(student => student.active !== false).slice();
+    const activity = activities.find(item => item.id === activityId);
+    const assigned = Array.isArray(activity?.assignedStudentIds) && activity.assignedStudentIds.length ? activity.assignedStudentIds.map(String) : null;
+    const roster = students.filter(student => student.active !== false && (!assigned || assigned.includes(String(student.id)))).slice();
     const known = (student: StudentRow, row: Record<string, unknown>) => sameStudent(row, student);
     results.filter(row => String(row.activity_id) === activityId).forEach(row => {
       if (roster.some(student => known(student, row))) return;
@@ -466,6 +475,30 @@ export default function ActivityManager() {
     });
     return roster.sort((a,b) => String(a.paternal_surname||"").localeCompare(String(b.paternal_surname||""),"es-MX") || String(a.given_names||"").localeCompare(String(b.given_names||""),"es-MX"));
   }
+  function reportRowsForActivity(activityId: string) {
+    return reportRoster(activityId).map((student,index)=>{
+      const attempts=results.filter(row=>String(row.activity_id)===activityId&&sameStudent(row,student));
+      const best=attempts.reduce<Record<string,unknown>|null>((current,candidate)=>{
+        if(!current)return candidate;
+        const currentRate=Number(current.correct||0)/Math.max(1,Number(current.total||0));
+        const candidateRate=Number(candidate.correct||0)/Math.max(1,Number(candidate.total||0));
+        return Number(candidate.grade||0)>Number(current.grade||0)||(Number(candidate.grade||0)===Number(current.grade||0)&&(candidateRate>currentRate||(candidateRate===currentRate&&Number(candidate.elapsed_seconds??Infinity)<Number(current.elapsed_seconds??Infinity))))?candidate:current;
+      },null);
+      return {student,attempts,best,index};
+    });
+  }
+  async function reopenForStudent(activityId:string,student:StudentRow) {
+    const studentId=String(student.id||"");
+    if(!studentId){setNotice("No se puede reabrir: falta la cuenta de este alumno.");return;}
+    setReopeningStudent(studentId);setNotice("");
+    try {
+      const response=await apiRequest("/api/teacher/student-reopen",{method:"POST",headers:{"x-teacher-key":key},body:JSON.stringify({id:activityId,studentId})});
+      const data=await response.json();
+      if(!response.ok)throw new Error(data.error||"No se pudo reabrir la actividad.");
+      setNotice(`Se agregó 1 intento para ${String(student.given_names||"")} ${String(student.paternal_surname||"")}. Podrá entrar durante 7 días; sus resultados anteriores se conservan.`);
+      await Promise.all([loadActivities(key),loadStudents(key)]);
+    } catch(error){handlePanelError(error)} finally{setReopeningStudent("")}
+  }
 
   return <main className="activity-manager-page">
     <header className="am-header"><a href="?panel=actividades"><span className="am-logo">A</span>Aula en juego</a><nav className="am-top-nav"><a className={view === "activities" ? "active" : ""} href="?panel=actividades"><HeaderIcon name="activities"/>Mis actividades</a><a className={view === "results" ? "active" : ""} href="?panel=resultados"><HeaderIcon name="results"/>Mis resultados</a><a href="?panel=alumnos&modo=maestro&tab=students"><HeaderIcon name="students"/>Mis alumnos</a><a className={`am-nav-create ${section === "create" ? "active" : ""}`} href="?panel=actividades&seccion=crear"><HeaderIcon name="create"/>Crear actividad</a><div className="am-account"><button aria-expanded={accountOpen} onClick={() => setAccountOpen(open => !open)}>{getTeacherUsername()} <span aria-hidden="true">⌄</span></button>{accountOpen&&<div className="am-account-menu"><strong>Sesión docente</strong><button onClick={()=>{void logoutTeacher();setKey("");setReady(false);setDraftCredentials({username:"",password:""});setAccountOpen(false);}}>Cerrar sesión</button></div>}</div></nav></header>
@@ -474,7 +507,29 @@ export default function ActivityManager() {
         <div className="am-list-heading"><div><span className="am-kicker">REGISTRO DEL GRUPO</span><h1>Mis resultados</h1><p>Consulta el avance de cada alumno por actividad.</p></div><button className="am-refresh" onClick={()=>void refresh()} disabled={busy}>Actualizar resultados</button></div>
         {!selectedField ? <><h2 className="am-field-prompt">Elige un campo formativo</h2><div className="am-field-grid">{formativeFields.map(field=>{const count=activities.filter(activity=>activity.fieldFormative===field.id).length;const summary=formativeSummary(field.id);return <button className="am-field-card" key={field.id} onClick={()=>selectField(field.id)}><span>{field.icon}</span><strong>{field.title}</strong><small>{field.description}</small><b>{count} {count===1?"actividad":"actividades"} · {summary.average===null?"sin calificaciones":`promedio ${summary.average.toFixed(1)}/10`}<i aria-hidden="true">→</i></b></button>})}<button className="am-field-card am-field-unassigned" onClick={()=>selectField("sin-asignar")}><span>＋</span><strong>Sin campo asignado</strong><small>Actividades pendientes de clasificar</small><b>{activities.filter(activity=>!activity.fieldFormative).length} actividades<i aria-hidden="true">→</i></b></button></div></> : <><div className="am-report-breadcrumb"><button onClick={()=>selectField("")}>← Campos formativos</button><div><span className="am-kicker">CAMPO FORMATIVO</span><h2>{selectedFormative?.title || "Sin campo asignado"}</h2><p>Elige una actividad para consultar resultados del grupo y de cada alumno.</p></div></div>{fieldActivities.length?<div className="am-report-activity-grid">{fieldActivities.map(activity=>{const definition=templateRegistry.find(item=>item.id===(activity.kind==="diagram"||!activity.kind?"diagram-labels":activity.kind));const rows=results.filter(row=>String(row.activity_id)===activity.id);const unique=new Map<string,Record<string,unknown>>();rows.forEach(row=>{const k=String(row.student_id||[row.given_names,row.paternal_surname,row.maternal_surname].join("|")).toLocaleLowerCase("es-MX");const previous=unique.get(k);if(!previous||Number(row.grade||0)>Number(previous.grade||0))unique.set(k,row)});const avg=unique.size?[...unique.values()].reduce((sum,row)=>sum+Number(row.grade||0),0)/unique.size:null;return <button className={`am-report-activity theme-${activity.cardTheme||"mint"}`} key={activity.id} onClick={()=>selectReport(activity.id)}><span>{definition?.title||"Actividad"}</span><strong>{activity.title}</strong><small>{activity.availableFrom?`Se activa ${new Date(activity.availableFrom).toLocaleDateString("es-MX")}: `:""}{activity.availableUntil?`Cierra ${new Date(activity.availableUntil).toLocaleDateString("es-MX")}`:"Sin fecha de cierre"}</small><b>{reportLoadState==="loading"?"Cargando resultados":reportLoadState==="error"?"Resultados no disponibles":avg===null?"Sin calificaciones":`Promedio del grupo ${avg.toFixed(1)} / 10`} · {reportLoadState==="loading"||reportLoadState==="error"?"—":unique.size} alumnos <i aria-hidden="true">→</i></b></button>})}</div>:<div className="am-empty">Todavía no hay actividades en este campo formativo.</div>}</>}
         {notice&&<p className="am-notice" role="status">{notice}</p>}
-        {reportActivityId && currentReport ? <><div className="am-report-selected"><button onClick={()=>selectReport("")}>← Actividades de {selectedFormative?.title||"este campo"}</button><div><span className="am-kicker">REPORTE DE ACTIVIDAD</span><h2>{currentReport.title}</h2><p>El grupo se ordena por alumno. Se muestra su mejor calificación; intentos y mejor tiempo van aparte.</p></div></div><div className="am-results-table-wrap"><table><thead><tr><th>Alumno</th><th>Aciertos</th><th>Mejor calificación</th><th>Intentos</th><th>Mejor tiempo</th><th>Estado</th></tr></thead><tbody>{reportRoster(reportActivityId).map((student,index)=>{const attemptsForStudent=results.filter(row=>String(row.activity_id)===reportActivityId&&sameStudent(row,student));const best=attemptsForStudent.reduce<Record<string,unknown>|null>((current,candidate)=>{if(!current)return candidate;const currentRate=Number(current.correct||0)/Math.max(1,Number(current.total||0)),candidateRate=Number(candidate.correct||0)/Math.max(1,Number(candidate.total||0));return Number(candidate.grade||0)>Number(current.grade||0)||(Number(candidate.grade||0)===Number(current.grade||0)&&(candidateRate>currentRate||(candidateRate===currentRate&&Number(candidate.elapsed_seconds??Infinity)<Number(current.elapsed_seconds??Infinity))))?candidate:current},null);const fullName=[student.given_names,student.paternal_surname,student.maternal_surname].map(value=>String(value||"").trim()).filter(Boolean).join(" ");const duration=best?Math.max(0,Number(best.elapsed_seconds)||0):0;return <tr key={String(student.id||index)}><td>{fullName||"Alumno"}</td><td>{best?`${String(best.correct||0)} / ${String(best.total||0)}`:"—"}</td><td>{best?`${String(best.grade||0)} / 10`:"—"}</td><td>{attemptsForStudent.length}</td><td>{best?`${Math.floor(duration/60)}:${String(duration%60).padStart(2,"0")}`:"—"}</td><td><span className={best?"am-report-done":"am-report-pending"}>{best?"Realizada":"Pendiente"}</span></td></tr>})}</tbody></table>{reportLoadState==="loading"&&results.length===0?<div className="am-empty">Cargando las calificaciones guardadas…</div>:reportLoadState==="error"?<div className="am-empty">No se pudo consultar la hoja de resultados. Pulsa «Actualizar resultados» para volver a intentarlo.</div>:reportRoster(reportActivityId).length===0&&<div className="am-empty">No hay cuentas activas ni resultados guardados para esta actividad.</div>}</div></> : null}
+        {reportActivityId && currentReport ? <>
+          <div className="am-report-selected">
+            <button onClick={()=>selectReport("")}>← Actividades de {selectedFormative?.title||"este campo"}</button>
+            <div><span className="am-kicker">REPORTE DE ACTIVIDAD</span><h2>{currentReport.title}</h2><p>Consulta quién la realizó, quién sigue pendiente y las mejores calificaciones.</p></div>
+          </div>
+          <div className="am-report-tabs" role="tablist" aria-label="Vistas del reporte">
+            <button className={reportTab==="completed"?"active":""} onClick={()=>setReportTab("completed")}>Ya lo hicieron <span>{currentReportRows.filter(item=>item.best).length}</span></button>
+            <button className={reportTab==="pending"?"active":""} onClick={()=>setReportTab("pending")}>No lo han resuelto <span>{currentReportRows.filter(item=>!item.best).length}</span></button>
+            <button className={reportTab==="ranking"?"active":""} onClick={()=>setReportTab("ranking")}>Tabla de posiciones <span>{reportLeaderboard.length}</span></button>
+          </div>
+          {reportTab==="ranking" ? <ActivityLeaderboard rows={reportLeaderboard}><p>Se conserva la mejor calificación de cada alumno; en empate se considera el tiempo.</p></ActivityLeaderboard> : <div className="am-results-table-wrap">
+            <table><thead><tr><th>Alumno</th><th>Aciertos</th><th>Mejor calificación</th><th>Intentos</th><th>Mejor tiempo</th><th>Estado</th><th>Acción docente</th></tr></thead>
+              <tbody>{visibleReportRows.map(({student,attempts,best,index})=>{
+                const fullName=[student.given_names,student.paternal_surname,student.maternal_surname].map(value=>String(value||"").trim()).filter(Boolean).join(" ");
+                const duration=best?Math.max(0,Number(best.elapsed_seconds)||0):0;
+                const studentId=String(student.id||"");
+                const canReopen=students.some(item=>String(item.id||"")===studentId&&item.active!==false);
+                return <tr key={studentId||index}><td>{fullName||"Alumno"}</td><td>{best?`${String(best.correct||0)} / ${String(best.total||0)}`:"—"}</td><td>{best?`${Number(best.grade||0).toFixed(1)} / 10`:"—"}</td><td>{attempts.length}</td><td>{best?`${Math.floor(duration/60)}:${String(duration%60).padStart(2,"0")}`:"—"}</td><td><span className={best?"am-report-done":"am-report-pending"}>{best?"Realizada":"Pendiente"}</span></td><td><button className="am-reopen-student" disabled={reopeningStudent===studentId||!canReopen} title={canReopen?"Añade un intento y abre la actividad durante 7 días":"Solo se puede abrir para una cuenta activa"} onClick={()=>void reopenForStudent(reportActivityId,student)}>{reopeningStudent===studentId?"Abriendo…":attempts.length?"Dar otro intento":"Abrir juego"}</button></td></tr>;
+              })}</tbody>
+            </table>
+            {reportLoadState==="loading"&&results.length===0?<div className="am-empty">Cargando las calificaciones guardadas…</div>:reportLoadState==="error"?<div className="am-empty">No se pudo consultar la hoja de resultados. Pulsa «Actualizar resultados» para volver a intentarlo.</div>:visibleReportRows.length===0&&<div className="am-empty">{reportTab==="completed"?"Todavía nadie ha realizado esta actividad.":"Todos los alumnos ya realizaron esta actividad."}</div>}
+          </div>}
+        </> : null}
       </section> : section === "create" ? <>
       <div className="am-heading"><div><span className="am-kicker">NUEVA ACTIVIDAD</span><h1>Elige una plantilla</h1><p>Al elegir un tipo de juego, se abrirá directamente su editor.</p></div><a className="am-back-link" href="?panel=actividades">← Mis actividades</a></div>
       {notice&&<p className="am-notice" role="status">{notice}</p>}

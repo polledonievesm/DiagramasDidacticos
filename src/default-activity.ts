@@ -48,6 +48,8 @@ export type Activity = {
   availableUntil?: string | null;
   fieldFormative?: FormativeField | "" | null;
   coverImageUrl?: string | null;
+  /** Local upload, consumed by Apps Script and replaced by coverImageUrl after save. */
+  coverImageData?: string | null;
   cardTheme?: "mint" | "sky" | "lilac" | "peach";
   imageUrl: string;
   imageKey?: string | null;

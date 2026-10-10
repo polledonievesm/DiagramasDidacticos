@@ -5,8 +5,9 @@ import type { FormativeField } from "./default-activity";
 import { fieldFromCover } from "./formative-field";
 import "./student-portal.css";
 import PasswordField from "./PasswordField";
+import ActivityLeaderboard, { type LeaderboardRow } from "./ActivityLeaderboard";
 
-type PortalActivity = { id:string; title:string; instructions?:string; kind:ActivityKind; imageUrl?:string; theme?:"mint"|"sky"|"lilac"|"peach"; fieldFormative?:FormativeField|""; availableFrom:string|null; dueAt:string|null; scheduled:boolean; expired:boolean; attempts:number; bestGrade:number|null; completed:boolean };
+type PortalActivity = { id:string; title:string; instructions?:string; kind:ActivityKind; imageUrl?:string; theme?:"mint"|"sky"|"lilac"|"peach"; fieldFormative?:FormativeField|""; availableFrom:string|null; dueAt:string|null; scheduled:boolean; expired:boolean; attempts:number; bestGrade:number|null; completed:boolean; canStart:boolean; reopened?:boolean; reopenUntil?:string|null };
 type PortalData = { student:{id:string;name:string;givenNames:string;paternalSurname:string;maternalSurname:string;username:string}; activities:PortalActivity[]; average:number|null; completedCount:number };
 const studentFields: { id:FormativeField; title:string; icon:string }[] = [
   {id:"lenguajes",title:"Lenguajes",icon:"Aa"},
@@ -23,10 +24,18 @@ function activityLink(activity:PortalActivity) {
   return url.toString();
 }
 
-function ActivityCard({item, state}:{item:PortalActivity;state:"pending"|"done"|"scheduled"|"expired"}) {
+function ActivityCard({item, state}:{item:PortalActivity;state:"new"|"pending"|"done"|"scheduled"}) {
   const [imageFailed,setImageFailed]=useState(false);
-  const status={pending:"Pendiente",done:"Realizada",scheduled:"Próximamente",expired:item.completed?"Cerrada · realizada":"Cerrada · pendiente"}[state];
-  const startLabel=item.availableFrom?`${state==="scheduled"?"Se activa":"Abrió"} ${new Date(item.availableFrom).toLocaleString("es-MX")}`:"Disponible sin fecha de activación"; const endLabel=item.dueAt?`${state==="expired"?"Cerró":"Cierra"} ${new Date(item.dueAt).toLocaleString("es-MX")}`:"Sin fecha de cierre"; const deadline=`${startLabel} · ${endLabel}`;
+  const [ranking,setRanking]=useState<LeaderboardRow[]|null>(null);
+  const [rankingOpen,setRankingOpen]=useState(false);
+  const [rankingBusy,setRankingBusy]=useState(false);
+  const status={new:item.reopened?"Reabierta":"Nueva",pending:"Pendiente · plazo vencido",done:"Realizada",scheduled:"Próximamente"}[state];
+  const startLabel=item.availableFrom?`${state==="scheduled"?"Se activa":"Abrió"} ${new Date(item.availableFrom).toLocaleString("es-MX")}`:"Disponible sin fecha de activación"; const endLabel=item.dueAt?`${state==="pending"?"Cerró":"Cierra"} ${new Date(item.dueAt).toLocaleString("es-MX")}`:"Sin fecha de cierre"; const deadline=`${startLabel} · ${endLabel}`;
+  async function toggleRanking(){
+    if(rankingOpen){setRankingOpen(false);return;}
+    setRankingOpen(true);if(ranking)return;setRankingBusy(true);
+    try{const response=await apiRequest(`/api/leaderboard?activityId=${encodeURIComponent(item.id)}`);const data=await response.json();if(!response.ok||!Array.isArray(data))throw new Error("No se pudo cargar la tabla de posiciones.");setRanking(data as LeaderboardRow[])}catch{setRanking([])}finally{setRankingBusy(false)}
+  }
   return <article className={`sp-card theme-${item.theme||"mint"} sp-card-${state}`}>
     <div className="sp-cover">
       {item.imageUrl&&!imageFailed&&<img src={item.imageUrl} alt={`Portada de ${item.title}`} loading="lazy" onError={()=>setImageFailed(true)}/>}
@@ -37,8 +46,8 @@ function ActivityCard({item, state}:{item:PortalActivity;state:"pending"|"done"|
       <h3>{item.title}</h3>
       <p>{item.instructions||"Practica y revisa lo que has aprendido."}</p>
       {state==="done"&&<div className="sp-grade-note"><span>Tu mejor calificación</span><strong>{Number(item.bestGrade||0).toFixed(1)}<small> / 10</small></strong><small>{item.attempts} {item.attempts===1?"intento":"intentos"}</small></div>}
-      {state==="expired"&&item.completed&&<div className="sp-grade-note"><span>Mejor calificación</span><strong>{Number(item.bestGrade||0).toFixed(1)}<small> / 10</small></strong></div>}
-      <div className="sp-card-bottom"><small>{deadline}</small>{state==="pending"&&<a href={activityLink(item)}>Comenzar <span aria-hidden="true">→</span></a>}{state==="done"&&<a className="sp-secondary-link" href={activityLink(item)}>Volver a practicar</a>}</div>
+      <div className="sp-card-bottom"><small>{item.reopened&&item.reopenUntil?`Reabierta hasta ${new Date(item.reopenUntil).toLocaleDateString("es-MX")}`:`${deadline}${state==="pending"?" · Pide a tu maestro que la reabra":""}`}</small>{(state==="new"||state==="done")&&item.canStart&&<a href={activityLink(item)}>{item.completed?"Intentar de nuevo":"Comenzar"} <span aria-hidden="true">→</span></a>}{state==="done"&&<button className="sp-secondary-link" type="button" onClick={()=>void toggleRanking()}>{rankingOpen?"Ocultar tabla":"Ver tabla de posiciones"}</button>}</div>
+      {state==="done"&&rankingOpen&&<div className="sp-ranking-panel">{rankingBusy?<p>Cargando posiciones…</p>:<ActivityLeaderboard rows={ranking||[]}/>}</div>}
     </div>
   </article>;
 }
@@ -69,7 +78,7 @@ export default function StudentPortal() {
     // learner has signed out (or switched accounts in another tab).
     if(getStudentSession()?.token!==token) return;
     const enriched=data as PortalData;
-    enriched.activities=enriched.activities.map(item=>({...item,fieldFormative:fieldFromCover(item.imageUrl)}));
+    enriched.activities=enriched.activities.map(item=>({...item,fieldFormative:item.fieldFormative||fieldFromCover(item.imageUrl)}));
     setPortal(enriched);
     saveStudentSession(token,(data as PortalData).student);
   }
@@ -157,8 +166,10 @@ export default function StudentPortal() {
   );
 
   const visibleActivities=selectedField?portal.activities.filter(item=>selectedField==="sin-asignar"?!item.fieldFormative:item.fieldFormative===selectedField):portal.activities;
-  const open=visibleActivities.filter(item=>!item.expired&&!item.scheduled),scheduled=visibleActivities.filter(item=>item.scheduled&&!item.expired),expired=visibleActivities.filter(item=>item.expired);
-  const pending=open.filter(item=>!item.completed),completed=open.filter(item=>item.completed);
+  const newActivities=visibleActivities.filter(item=>!item.completed&&!item.expired&&!item.scheduled);
+  const pending=visibleActivities.filter(item=>!item.completed&&item.expired);
+  const completed=visibleActivities.filter(item=>item.completed);
+  const scheduled=visibleActivities.filter(item=>item.scheduled&&!item.expired);
   const fieldAverage=(field:string)=>{const grades=portal.activities.filter(item=>(field==="sin-asignar"?!item.fieldFormative:item.fieldFormative===field)&&item.bestGrade!==null).map(item=>Number(item.bestGrade));return grades.length?grades.reduce((sum,value)=>sum+value,0)/grades.length:null;};
   function chooseField(field:string){setSelectedField(field);const url=new URL(window.location.href);if(field)url.searchParams.set("campo",field);else url.searchParams.delete("campo");window.history.replaceState(null,"",url);}
   const initials=(portal.student.givenNames||portal.student.name||"A").slice(0,1).toLocaleUpperCase("es-MX");
@@ -174,17 +185,16 @@ export default function StudentPortal() {
         <section className="sp-main" id="inicio">
           <div className="sp-welcome"><div><span className="sp-kicker">TU ESPACIO DE APRENDIZAJE</span><h1>¡Hola, {portal.student.givenNames||portal.student.name}!</h1><p>Estas son tus actividades. Elige una para empezar.</p></div><div className="sp-welcome-art" aria-hidden="true"><span>✦</span><i/><i/><b/></div></div>
           <div className="sp-stats">
-            <a className="sp-stat sp-stat-pending" href="#pendientes"><span className="sp-stat-icon"><LineIcon name="book"/></span><span>Por realizar<strong>{pending.length}</strong></span><span className="sp-stat-arrow">›</span></a>
+            <a className="sp-stat sp-stat-pending" href="#nuevas"><span className="sp-stat-icon"><LineIcon name="book"/></span><span>Nuevas<strong>{newActivities.length+scheduled.length}</strong></span><span className="sp-stat-arrow">›</span></a>
             <a className="sp-stat sp-stat-done" href="#realizadas"><span className="sp-stat-icon"><LineIcon name="check"/></span><span>Realizadas<strong>{visibleActivities.filter(item=>item.completed).length}</strong></span><span className="sp-stat-arrow">›</span></a>
             <a className="sp-stat sp-stat-average" id="promedio" href="#realizadas"><span className="sp-stat-icon"><LineIcon name="chart"/></span><span>{selectedField?"Promedio del campo":"Mi promedio"}<strong>{(selectedField?fieldAverage(selectedField):portal.average)===null?"—":(selectedField?fieldAverage(selectedField):portal.average)!.toFixed(1)}<small>/10</small></strong></span><span className="sp-stat-arrow">›</span></a>
           </div>
           <section className="sp-field-section"><div className="sp-section-heading"><h2><LineIcon name="book"/>Campos formativos</h2>{selectedField&&<button onClick={()=>chooseField("")}>Ver todos los campos</button>}</div><div className="sp-field-grid">{studentFields.map(field=>{const count=portal.activities.filter(item=>item.fieldFormative===field.id).length;const avg=fieldAverage(field.id);return <button className={`sp-field-card ${selectedField===field.id?"selected":""}`} key={field.id} onClick={()=>chooseField(field.id)}><span>{field.icon}</span><strong>{field.title}</strong><small>{count} {count===1?"actividad":"actividades"} · {avg===null?"sin calificaciones":`promedio ${avg.toFixed(1)}/10`}</small></button>})}{(()=>{const count=portal.activities.filter(item=>!item.fieldFormative).length;const avg=fieldAverage("sin-asignar");return count?<button className={`sp-field-card ${selectedField==="sin-asignar"?"selected":""}`} key="sin-asignar" onClick={()=>chooseField("sin-asignar")}><span>＋</span><strong>Sin campo asignado</strong><small>{count} actividades · {avg===null?"sin calificaciones":`promedio ${avg.toFixed(1)}/10`}</small></button>:null})()}</div></section>
-          <section className="sp-section" id="pendientes"><div className="sp-section-heading"><h2><LineIcon name="book"/>{selectedField?(studentFields.find(field=>field.id===selectedField)?.title||"Sin campo asignado"):"Por realizar"} <span>{pending.length}</span></h2><a href="#pendientes">Ver todas <b>›</b></a></div>
-            {pending.length ? <div className="sp-grid">{pending.map(item=><ActivityCard item={item} state="pending" key={item.id}/>)}</div> : <p className="sp-empty">¡Muy bien! No tienes actividades pendientes.</p>}
+          <section className="sp-section" id="nuevas"><div className="sp-section-heading"><h2><LineIcon name="book"/>Nuevas actividades <span>{newActivities.length+scheduled.length}</span></h2><a href="#pendientes">Ver pendientes <b>›</b></a></div>
+            {newActivities.length+scheduled.length ? <div className="sp-grid">{newActivities.map(item=><ActivityCard item={item} state="new" key={item.id}/>)}{scheduled.map(item=><ActivityCard item={item} state="scheduled" key={item.id}/>)}</div> : <p className="sp-empty">No hay actividades nuevas por ahora.</p>}
           </section>
+          <section className="sp-section" id="pendientes"><div className="sp-section-heading"><h2><LineIcon name="calendar"/>Pendientes <span>{pending.length}</span></h2></div>{pending.length?<div className="sp-grid">{pending.map(item=><ActivityCard item={item} state="pending" key={item.id}/>)}</div>:<p className="sp-empty">No tienes actividades vencidas sin realizar.</p>}</section>
           {completed.length>0&&<section className="sp-section" id="realizadas"><div className="sp-section-heading"><h2><LineIcon name="check"/>Realizadas <span>{completed.length}</span></h2></div><div className="sp-grid sp-grid-done">{completed.map(item=><ActivityCard item={item} state="done" key={item.id}/>)}</div></section>}
-          {scheduled.length>0&&<section className="sp-section"><div className="sp-section-heading"><h2><LineIcon name="calendar"/>Programadas <span>{scheduled.length}</span></h2></div><div className="sp-grid">{scheduled.map(item=><ActivityCard item={item} state="scheduled" key={item.id}/>)}</div></section>}
-          {expired.length>0&&<section className="sp-section sp-expired"><div className="sp-section-heading"><h2><LineIcon name="calendar"/>Plazo terminado <span>{expired.length}</span></h2></div><div className="sp-grid">{expired.map(item=><ActivityCard item={item} state="expired" key={item.id}/>)}</div></section>}
         </section>
       </div>
     </main>

@@ -427,6 +427,14 @@ export async function apiRequest(path: string, init: RequestInit = {}) {
     cachedActivities.set(activity.id, activity);
     return response(activity as unknown as ApiResult);
   }
+  if (method === "POST" && url.pathname.endsWith("/api/teacher/student-reopen")) {
+    const key = new Headers(init.headers).get("x-teacher-key") || "";
+    await send({ ...body, action: "reopenStudentActivity", key });
+    const verified = await jsonp<ApiResult>({ action: "studentActivityAccess", id: String(body.id || ""), studentId: String(body.studentId || ""), key });
+    if ("error" in verified) return response(verified, 401);
+    if (!verified || Number(verified.extraAttempts || 0) < 1 || !verified.until) return response({ error: "No se pudo confirmar la reapertura para este alumno." }, 503);
+    return response(verified);
+  }
   if (method === "POST" && url.pathname.endsWith("/api/teacher/activity-archive")) {
     const key = new Headers(init.headers).get("x-teacher-key") || "";
     const id = String(body.id || "");

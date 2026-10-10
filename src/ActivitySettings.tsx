@@ -1,5 +1,6 @@
 import type { Dispatch, SetStateAction } from "react";
 import type { Activity, FormativeField } from "./default-activity";
+import { imageFileToDataUrl } from "./image-utils";
 import "./activity-settings.css";
 
 const fields: { value: FormativeField; label: string }[] = [
@@ -18,19 +19,31 @@ function localValue(value?: string | null) {
 
 function isoValue(value: string) { return value ? new Date(value).toISOString() : null; }
 
-export default function ActivitySettings({ value, onChange, title = "Configuración de actividad", includeCoreControls = true }: {
+export default function ActivitySettings({ value, onChange, title = "Configuración de actividad", includeCoreControls = true, includeCoverImage = true }: {
   value: Activity;
   onChange: Dispatch<SetStateAction<Activity>>;
   title?: string;
   includeCoreControls?: boolean;
+  includeCoverImage?: boolean;
 }) {
   const patch = (updates: Partial<Activity>) => onChange(current => ({ ...current, ...updates }));
   const fallbackShuffle = value.shuffle !== false;
   const selectedField = fields.find(field => field.value === value.fieldFormative)?.label || "Campo formativo sin seleccionar";
   const clockLabel = value.timerMode === "down" ? "Cuenta regresiva" : value.timerMode === "up" ? "Cronómetro" : "Sin límite de tiempo";
+  const coverPreview = value.coverImageData || value.coverImageUrl;
+  async function uploadCover(file?: File) {
+    if (!file) return;
+    try { patch({ coverImageData: await imageFileToDataUrl(file) }); }
+    catch (error) { window.alert(error instanceof Error ? error.message : "No se pudo leer la imagen."); }
+  }
   return <details className="shared-settings">
     <summary><strong>{title}</strong><span>{selectedField} · {clockLabel}</span></summary>
     <div className="shared-settings-content">
+    {includeCoverImage && <div className="activity-cover-setting">
+      <div><strong>Portada de la actividad</strong><small>Esta imagen aparecerá en el panel del alumno y en el del maestro.</small></div>
+      {coverPreview && <img src={coverPreview} alt="Vista previa de la portada"/>}
+      <label className="activity-cover-upload">{coverPreview ? "Cambiar imagen" : "＋ Subir imagen"}<input type="file" accept="image/png,image/jpeg,image/webp" onChange={event=>{void uploadCover(event.currentTarget.files?.[0]);event.currentTarget.value=""}}/></label>
+    </div>}
     <div className="shared-settings-grid">
       <label>Campo formativo<select value={value.fieldFormative || ""} onChange={event => patch({ fieldFormative: event.target.value as FormativeField | "" })}>
         <option value="">Selecciona un campo formativo</option>{fields.map(field => <option key={field.value} value={field.value}>{field.label}</option>)}
