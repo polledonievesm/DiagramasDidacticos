@@ -9,7 +9,7 @@ const STUDENT_SESSION_KEY = "aulaStudentSessionV1";
 const STUDENT_SESSION_CLOSED_KEY = "aulaStudentSessionClosedV1";
 const SESSION_ROLE_KEY = "aulaSessionRoleV1";
 const SESSION_CHANGED_EVENT = "aula-session-change";
-export type StudentSessionProfile = { id:string; name?:string; givenNames:string; paternalSurname:string; maternalSurname:string; username:string };
+export type StudentSessionProfile = { id:string; name?:string; givenNames:string; paternalSurname:string; maternalSurname:string; username:string; lastLoginAt?:string };
 
 export function getStudentSession() {
   try {
@@ -120,11 +120,11 @@ function endpoint() {
   return value;
 }
 
-function jsonpOnce<T>(params: Record<string, string>): Promise<T> {
+function jsonpOnce<T>(params: Record<string, string>, timeoutMs = 20000): Promise<T> {
   return new Promise((resolve, reject) => {
     const callback = `gasCallback_${Date.now()}_${Math.random().toString(36).slice(2)}`;
     const script = document.createElement("script");
-    const timer = window.setTimeout(() => finish(new Error("El servidor tardó demasiado en responder.")), 20000);
+    const timer = window.setTimeout(() => finish(new Error("El servidor tardó demasiado en responder.")), timeoutMs);
     const finish = (error?: Error, data?: T) => {
       window.clearTimeout(timer);
       script.remove();
@@ -162,6 +162,27 @@ async function send(payload: Record<string, unknown>) {
     headers: { "Content-Type": "text/plain;charset=utf-8" },
     body: JSON.stringify(payload),
   });
+}
+
+async function waitForLoginResult(action: "loginResult" | "teacherLoginResult", requestId: string) {
+  // doPost guarda el resultado antes de responder. Una consulta inmediata suele
+  // bastar; los pocos reintentos solo cubren el retardo de la caché/red.
+  const delays = [0, 250, 500, 900, 1400];
+  const started = Date.now();
+  let lastError: unknown = null;
+  for (const delay of delays) {
+    if (delay) await new Promise(resolve => window.setTimeout(resolve, delay));
+    const remaining = 12000 - (Date.now() - started);
+    if (remaining <= 0) break;
+    try {
+      const data = await jsonpOnce<ApiResult>({ action, requestId }, Math.min(7000, remaining));
+      if (!data.pending) return data;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  if (lastError instanceof Error && Date.now() - started >= 10000) throw lastError;
+  throw new Error("El acceso tardó demasiado. Comprueba tu conexión y vuelve a intentarlo.");
 }
 
 function normalizeDriveImageUrl(value: string): string {
@@ -247,6 +268,11 @@ export async function apiRequest(path: string, init: RequestInit = {}) {
     const data = await jsonp<ApiResult[] | ApiResult>({ action: "results", key });
     return response(data as unknown as ApiResult, Array.isArray(data) ? 200 : 401);
   }
+  if (method === "GET" && url.pathname.endsWith("/api/teacher/session")) {
+    const key = new Headers(init.headers).get("x-teacher-key") || "";
+    const data = await jsonp<ApiResult>({ action: "teacherSession", key });
+    return response(data, "error" in data ? 401 : 200);
+  }
   if (method === "GET" && url.pathname.endsWith("/api/teacher/students")) {
     const key = new Headers(init.headers).get("x-teacher-key") || "";
     const data = await jsonp<ApiResult[] | ApiResult>({ action: "students", key });
@@ -255,22 +281,14 @@ export async function apiRequest(path: string, init: RequestInit = {}) {
   if (method === "POST" && url.pathname.endsWith("/api/student/login")) {
     const requestId = crypto.randomUUID();
     await send({ action: "studentLogin", requestId, username: String(body.username || ""), password: String(body.password || "") });
-    for (let i = 0; i < 30; i++) {
-      const data = await jsonp<ApiResult>({ action: "loginResult", requestId });
-      if (!data.pending) return response(data, "error" in data ? 401 : 200);
-      await new Promise((resolve) => window.setTimeout(resolve, 300));
-    }
-    return response({ error: "El acceso tardó demasiado. Vuelve a intentarlo." }, 503);
+    const data = await waitForLoginResult("loginResult", requestId);
+    return response(data, "error" in data ? 401 : 200);
   }
   if (method === "POST" && url.pathname.endsWith("/api/teacher/login")) {
     const requestId = crypto.randomUUID();
     await send({ action: "teacherLogin", requestId, username: String(body.username || ""), password: String(body.password || "") });
-    for (let i = 0; i < 12; i++) {
-      const data = await jsonp<ApiResult>({ action: "teacherLoginResult", requestId });
-      if (!data.pending) return response(data, "error" in data ? 401 : 200);
-      await new Promise((resolve) => window.setTimeout(resolve, 250));
-    }
-    return response({ error: "El acceso tardó demasiado. Vuelve a intentarlo." }, 503);
+    const data = await waitForLoginResult("teacherLoginResult", requestId);
+    return response(data, "error" in data ? 401 : 200);
   }
   if (method === "POST" && url.pathname.endsWith("/api/teacher/logout")) {
     const token = String(body.token || "");

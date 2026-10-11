@@ -31,3 +31,8 @@
 @media(max-width:1000px){.sp-dashboard .sp-grid{grid-template-columns:repeat(auto-fill,minmax(205px,1fr))}}
 @media(max-width:680px){.sp-dashboard .sp-grid{grid-template-columns:1fr}.sp-dashboard .sp-cover{width:82px;min-width:82px;height:100%;min-height:125px;aspect-ratio:auto}.sp-dashboard .sp-card{grid-template-columns:82px minmax(0,1fr);min-height:125px}.sp-dashboard .sp-card-body{padding:9px}.sp-dashboard .sp-card h3{font-size:13px}.sp-dashboard .sp-card p{font-size:10px}.sp-card-bottom .sp-secondary-link{font-size:9px;padding:6px 7px}.sp-ranking-panel{grid-column:1/-1;padding:0 8px 8px}}
 .sp-ranking-panel .activity-leaderboard{border-color:#d5e7f1;background:#fbfdff;color:#29485e}.sp-ranking-panel .activity-leaderboard h2{color:#2b4b62}.sp-ranking-panel .activity-leaderboard li{border-color:#deebf2;background:#f7fbfe}.sp-ranking-panel .activity-leaderboard .podium-1{background:#fff9e8;border-color:#eed680}.sp-ranking-panel .activity-leaderboard .podium-2{background:#f4f7fa;border-color:#ced9e2}.sp-ranking-panel .activity-leaderboard .podium-3{background:#fff4ed;border-color:#e7b99b}
+
+/* Keep the login timestamp readable beside the learner name on narrow screens. */
+.sp-profile>span:nth-child(2){min-width:0}
+.sp-profile small{max-width:min(46vw,360px);line-height:1.35}
+@media(max-width:680px){.sp-topbar{height:auto;min-height:62px;gap:10px;padding:9px 12px}.sp-topbar>span{font-size:11px}.sp-profile{gap:6px}.sp-profile strong{font-size:11px}.sp-profile small{max-width:48vw;font-size:9px}}

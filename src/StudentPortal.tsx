@@ -8,13 +8,18 @@ import PasswordField from "./PasswordField";
 import ActivityLeaderboard, { type LeaderboardRow } from "./ActivityLeaderboard";
 
 type PortalActivity = { id:string; title:string; instructions?:string; kind:ActivityKind; imageUrl?:string; theme?:"mint"|"sky"|"lilac"|"peach"; fieldFormative?:FormativeField|""; availableFrom:string|null; dueAt:string|null; scheduled:boolean; expired:boolean; attempts:number; bestGrade:number|null; completed:boolean; canStart:boolean; reopened?:boolean; reopenUntil?:string|null };
-type PortalData = { student:{id:string;name:string;givenNames:string;paternalSurname:string;maternalSurname:string;username:string}; activities:PortalActivity[]; average:number|null; completedCount:number };
+type PortalData = { student:{id:string;name:string;givenNames:string;paternalSurname:string;maternalSurname:string;username:string;lastLoginAt?:string}; activities:PortalActivity[]; average:number|null; completedCount:number };
 const studentFields: { id:FormativeField; title:string; icon:string }[] = [
   {id:"lenguajes",title:"Lenguajes",icon:"Aa"},
   {id:"saberes",title:"Saberes y pensamiento científico",icon:"∑"},
   {id:"etica",title:"Ética, naturaleza y sociedades",icon:"⌂"},
   {id:"humano",title:"De lo humano y lo comunitario",icon:"♡"},
 ];
+function formatLastConnection(value?:string) {
+  if(!value) return "Última conexión: sin registro";
+  const date=new Date(value);
+  return Number.isFinite(date.getTime())?`Última conexión: ${new Intl.DateTimeFormat("es-MX",{day:"2-digit",month:"short",year:"numeric",hour:"numeric",minute:"2-digit"}).format(date)}`:"Última conexión: sin registro";
+}
 
 function activityLink(activity:PortalActivity) {
   const url=new URL(window.location.href); url.search="";
@@ -63,6 +68,7 @@ export default function StudentPortal() {
   const [portal,setPortal]=useState<PortalData|null>(null);
   const [credentials,setCredentials]=useState({username:"",password:""});
   const [busy,setBusy]=useState(false);
+  const [loginStage,setLoginStage]=useState<"auth"|"portal">("auth");
   const [checkingSession,setCheckingSession]=useState(()=>Boolean(session?.token));
   const [notice,setNotice]=useState("");
   const [selectedField,setSelectedField]=useState(new URLSearchParams(window.location.search).get("campo")||"");
@@ -107,14 +113,20 @@ export default function StudentPortal() {
   },[]);
 
   async function signIn(event:React.FormEvent) {
-    event.preventDefault(); setBusy(true); setNotice("");
+    event.preventDefault(); setBusy(true); setLoginStage("auth"); setNotice("");
+    const loginStartedAt=performance.now();
+    let authenticationMs=0;
     try {
       const response=await apiRequest("/api/student/login",{method:"POST",body:JSON.stringify(credentials)});
       const data=await response.json();
       if(!response.ok||!data.token||!data.student) throw new Error(data.error||"Revisa el usuario y la contraseña de tu tarjeta.");
+      authenticationMs=performance.now()-loginStartedAt;
       saveStudentSession(String(data.token),data.student); setSession({token:String(data.token),student:data.student});
-      setCredentials({username:"",password:""}); await load(String(data.token));
-    } catch(error) { setNotice(error instanceof Error?error.message:"No se pudo iniciar sesión."); }
+      setCredentials({username:"",password:""}); setLoginStage("portal");
+      const portalStartedAt=performance.now();
+      await load(String(data.token));
+      console.info("Aula en juego · tiempo de acceso alumno",{autenticacionMs:Math.round(authenticationMs),cargaPortalMs:Math.round(performance.now()-portalStartedAt),totalMs:Math.round(performance.now()-loginStartedAt)});
+    } catch(error) { console.info("Aula en juego · tiempo de acceso alumno",{autenticacionMs:Math.round(authenticationMs||performance.now()-loginStartedAt),fallo:error instanceof Error?error.message:"error"}); setNotice(error instanceof Error?error.message:"No se pudo iniciar sesión."); }
     finally { setBusy(false); }
   }
 
@@ -160,7 +172,7 @@ export default function StudentPortal() {
         <label>Usuario<input autoComplete="username" value={credentials.username} onChange={event=>setCredentials({...credentials,username:event.target.value})} required/></label>
         <label>Contraseña<PasswordField autoComplete="current-password" value={credentials.password} onChange={event=>setCredentials({...credentials,password:event.target.value})} required/></label>
         {notice&&<p className="sp-notice">{notice}</p>}
-        <button disabled={busy}>{busy?"Entrando…":"Ver mis actividades"}</button>
+        <button disabled={busy}>{busy?(loginStage==="auth"?"Verificando tu cuenta…":"Cargando tus actividades…"):"Ver mis actividades"}</button>
       </form>
     </main>
   );
@@ -181,7 +193,7 @@ export default function StudentPortal() {
         <button className="sp-logout" onClick={signOut}><LineIcon name="logout"/>Cerrar sesión</button>
       </aside>
       <div className="sp-dashboard-content">
-        <header className="sp-topbar"><span>Mi espacio de aprendizaje</span><div className="sp-profile"><span className="sp-avatar">{initials}</span><span><strong>{portal.student.givenNames} {portal.student.paternalSurname}</strong><small>Alumno</small></span><button onClick={signOut} aria-label="Cerrar sesión"><LineIcon name="logout"/></button></div></header>
+        <header className="sp-topbar"><span>Mi espacio de aprendizaje</span><div className="sp-profile"><span className="sp-avatar">{initials}</span><span><strong>{portal.student.givenNames} {portal.student.paternalSurname}</strong><small>Alumno · {formatLastConnection(portal.student.lastLoginAt)}</small></span><button onClick={signOut} aria-label="Cerrar sesión"><LineIcon name="logout"/></button></div></header>
         <section className="sp-main" id="inicio">
           <div className="sp-welcome"><div><span className="sp-kicker">TU ESPACIO DE APRENDIZAJE</span><h1>¡Hola, {portal.student.givenNames||portal.student.name}!</h1><p>Estas son tus actividades. Elige una para empezar.</p></div><div className="sp-welcome-art" aria-hidden="true"><span>✦</span><i/><i/><b/></div></div>
           <div className="sp-stats">

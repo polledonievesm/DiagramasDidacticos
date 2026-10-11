@@ -105,5 +105,50 @@
 
 .am-report-tabs{display:flex;flex-wrap:wrap;gap:8px;margin:18px 0 12px;padding:6px;border:1px solid #d8e7f0;border-radius:13px;background:#f5fafe}.am-report-tabs button{display:flex;align-items:center;gap:8px;padding:10px 13px;border:0;border-radius:9px;background:transparent;color:#48677e;font:inherit;font-weight:750;cursor:pointer}.am-report-tabs button.active{background:#fff;color:#1f78aa;box-shadow:0 2px 8px #21486c12}.am-report-tabs button span{display:grid;place-items:center;min-width:22px;height:22px;padding:0 6px;border-radius:99px;background:#e5f1f8;color:#326e91;font-size:12px}.am-reopen-student{padding:7px 10px;border:1px solid #c7e1f0;border-radius:8px;background:#edf7fc;color:#226f99;font:inherit;font-size:12px;font-weight:750;cursor:pointer;white-space:nowrap}.am-reopen-student:hover:not(:disabled){background:#dceff9}.am-reopen-student:disabled{opacity:.55;cursor:wait}
 
+/* Results dashboard: compact activity rail and one wide, readable report. */
+.am-main-results{width:min(100%,1540px);max-width:none;padding:26px 24px 60px}
+.am-results-panel.am-list{margin:0;padding:0;border:0;background:transparent;box-shadow:none}
+.am-results-layout{display:grid;grid-template-columns:265px minmax(0,1fr);align-items:start;gap:16px}
+.am-results-sidebar,.am-results-workspace{min-width:0;border:1px solid #d8e7f0;border-radius:17px;background:#fff;box-shadow:0 8px 26px #21486c0b}
+.am-results-sidebar{position:sticky;top:84px;max-height:calc(100vh - 100px);overflow:auto;padding:16px}
+.am-report-field-select{display:grid;gap:7px;color:#287ba8;font-size:11px;font-weight:850;letter-spacing:.08em;text-transform:uppercase}
+.am-report-field-select select{width:100%;min-height:42px;padding:8px 10px;border:1px solid #d4e4ee;border-radius:10px;background:#fff;color:#2a465b;font:inherit;font-size:13px;font-weight:700;letter-spacing:normal;text-transform:none}
+.am-sidebar-section-title{display:flex;justify-content:space-between;align-items:center;margin:20px 0 8px;color:#4d6b7e;font-size:12px;font-weight:850;text-transform:uppercase;letter-spacing:.06em}
+.am-sidebar-section-title span{display:grid;place-items:center;min-width:23px;height:23px;padding:0 6px;border-radius:99px;background:#eaf4fa;color:#32799e;font-size:11px}
+.am-results-activity-list{display:grid;gap:7px}
+.am-results-activity{display:grid;gap:4px;width:100%;padding:10px 11px;border:1px solid transparent;border-radius:11px;background:#f7fbfe;color:#2c485c;text-align:left;cursor:pointer;transition:background .15s,border-color .15s,box-shadow .15s}
+.am-results-activity:hover{border-color:#b9d8e8;background:#f0f8fc}
+.am-results-activity.active{border-color:#78b9d8;background:#eaf5fb;box-shadow:inset 3px 0 #2184cf}
+.am-results-activity small{color:#287ba8;font-size:10px;font-weight:800}
+.am-results-activity strong{font-size:13px;line-height:1.3;overflow-wrap:anywhere}
+.am-results-activity>span{color:#718493;font-size:10px}
+.am-sidebar-empty{margin:5px 0;color:#748696;font-size:12px;line-height:1.5}
+.am-results-workspace{padding:22px}
+.am-results-heading{display:flex;justify-content:space-between;align-items:center;gap:18px;margin-bottom:18px}
+.am-results-heading h1{margin:4px 0;font-size:30px;line-height:1.1;letter-spacing:-.035em;color:#24384a}
+.am-results-heading p{margin:4px 0 0;color:#637b8b;font-size:13px}
+.am-results-heading .am-refresh{flex:0 0 auto;min-height:40px;padding:9px 13px;border-radius:10px;background:#2184cf;border-color:#2184cf;font-size:12px}
+.am-results-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;margin:0 0 16px}
+.am-results-summary>div{display:grid;gap:5px;min-width:0;padding:12px 14px;border:1px solid #dceaf2;border-radius:12px;background:#f8fcfe}
+.am-results-summary>div span{color:#607b8d;font-size:11px;font-weight:700}
+.am-results-summary>div strong{color:#267da8;font-size:20px;line-height:1.15}
+.am-report-selected{margin:0;padding:15px 17px;border:1px solid #e0ebf1;border-radius:13px;background:#fff}
+.am-report-selected .am-kicker{font-size:10px}
+.am-report-selected h2{margin:4px 0;color:#24384a;font-size:19px;line-height:1.25}
+.am-report-selected p{margin:4px 0 0;color:#6b7f8e;font-size:12px}
+.am-report-tabs{margin:13px 0 11px}
+.am-results-table-wrap{overflow:auto;border:1px solid #d8e7f0;border-radius:13px;background:#fff}
+.am-results-table-wrap table{width:100%;min-width:920px;border-collapse:collapse;font-size:12px}
+.am-results-table-wrap th,.am-results-table-wrap td{padding:11px 10px;text-align:left;border-bottom:1px solid #e8f0f5;vertical-align:middle}
+.am-results-table-wrap th{background:#eff7fb;color:#4e7187;font-size:10px;text-transform:uppercase;letter-spacing:.045em;white-space:nowrap}
+.am-results-table-wrap tr:last-child td{border-bottom:0}
+.am-account>button{display:grid;justify-items:start;gap:1px;text-align:left}
+.am-account-name{display:flex;align-items:center;gap:5px}
+.am-account>button small{max-width:185px;color:#718594;font-size:9px;font-weight:600;white-space:normal;line-height:1.2}
+.am-account-menu>span{padding:4px 10px;color:#718594;font-size:11px;line-height:1.35}
+@media(max-width:1050px){.am-main-results{padding:22px 16px 44px}.am-results-layout{grid-template-columns:225px minmax(0,1fr);gap:12px}.am-results-workspace{padding:17px}.am-results-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.am-results-heading h1{font-size:27px}}
+@media(max-width:760px){.am-main-results{padding:14px 10px 34px}.am-results-layout{grid-template-columns:minmax(0,1fr)}.am-results-sidebar{position:static;max-height:none;padding:12px}.am-results-activity-list{grid-template-columns:repeat(2,minmax(0,1fr));max-height:210px;overflow:auto;padding-right:2px}.am-results-activity{padding:9px}.am-results-workspace{padding:14px}.am-results-heading{align-items:flex-start;flex-direction:column}.am-results-heading .am-refresh{width:auto}.am-results-tabs{overflow-x:auto;flex-wrap:nowrap}.am-report-tabs{flex-wrap:nowrap;overflow-x:auto}.am-report-tabs button{flex:0 0 auto}.am-account>button small{max-width:135px}}
+@media(max-width:440px){.am-results-summary>div{padding:10px}.am-results-summary>div strong{font-size:17px}.am-results-activity-list{grid-template-columns:1fr}.am-results-heading h1{font-size:25px}}
+
 /* Keep the teacher workspace in the same calm blue palette as the game and student portal. */
 .activity-manager-page{background:#edf5fa;color:#24384a}.am-header{background:#f7fbfe;border-color:#d8e7f0}.am-header>a{color:#24384a}.am-logo{background:#d9edf9;color:#2479aa}.am-header nav{color:#5f7586}.am-kicker{color:#287ba8}.am-refresh{background:#2184cf;border-color:#2184cf}.am-primary{background:#2184cf}.am-back-link{border-color:#d8e7f0;color:#32627e}.am-create,.am-list{border-color:#d8e7f0;box-shadow:0 10px 32px #21486c0b}.am-template-card:hover{border-color:#74b6d6;box-shadow:0 8px 20px #21486c12}.am-template-card>span{background:#eaf4fa;color:#287eaa}.am-template-card strong{color:#287eaa}.am-top-nav>a{color:#536d80}.am-top-nav>a:hover,.am-top-nav>a.active{color:#1d77a9}.am-top-nav>a.active{box-shadow:inset 0 -2px #3e9ac5}.am-top-nav>.am-nav-create,.am-top-nav>.am-nav-create:hover,.am-top-nav>.am-nav-create.active{background:#2184cf}.am-top-nav>.am-nav-create:hover{background:#176fae}.am-account-menu{border-color:#d8e7f0;box-shadow:0 14px 30px #21486c1b}.am-account-menu button{background:#edf6fb;color:#345c75}.am-field-card{border-color:#d8e7f0}.am-field-card:hover{border-color:#82bdd9;box-shadow:0 10px 22px #21486c13}.am-field-card>span{color:#2a80ab;background:#e7f3fa}.am-field-card>b{color:#327b9e}.am-report-activity{border-color:#d8e7f0}.am-report-activity:hover{border-color:#7cb9d6;box-shadow:0 9px 22px #21486c14}.am-results-table-wrap{border-color:#d8e7f0}.am-results-table-wrap th{background:#eff7fb;color:#4e7187}.am-report-done{background:#e8f4fb;color:#28769d}.am-report-pending{background:#edf2f5;color:#5e7484}.am-field-prompt{color:#2b4a60}.am-assignment-tools button,.am-publish-panel button{border-color:#cddfe9}.am-confirm-publish{background:#2184cf;color:#fff}.am-reopen-student{background:#edf7fc;color:#226f99}
