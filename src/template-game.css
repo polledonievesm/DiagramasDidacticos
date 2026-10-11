@@ -73,3 +73,29 @@
 .tg-answer-grid button img{width:46px;height:40px;object-fit:contain;flex:0 0 auto}
 .tg-sequence-image .editor-image-trigger{border:1px solid #f0bc82;background:#fff5e9;color:#df8429}
 @media(max-width:680px){.tg-quiz-question-row .tg-options{grid-template-columns:repeat(2,minmax(0,1fr))}.tg-quiz-question-row{padding:9px}.tg-option-field .editor-image-preview img{width:30px;height:28px}}
+
+/* Compacta el flujo del editor de contenido sin tocar la configuración. */
+.tg-page:has(.tg-shell) .tg-header{position:sticky;top:0;z-index:50;margin-bottom:12px;background:rgba(255,255,255,.96);backdrop-filter:blur(12px)}
+.tg-shell>.editor-workflow{margin-bottom:6px;padding-bottom:7px}
+.tg-form{gap:6px}
+.tg-form>.tg-full>h2{margin:1px 0 6px;font-size:21px;line-height:1.25}
+.tg-form .editor-content-header{margin:0}
+.tg-quiz-question-row{gap:6px;margin:7px 0;padding:9px}
+.tg-quiz-question-row>header{min-height:24px}
+.tg-quiz-question-row>label{gap:3px;font-size:12px}
+.tg-quiz-question-row .tg-prompt-label .tg-field-with-image{min-height:42px}
+.tg-quiz-question-row .tg-prompt-label input:not([type=file]){height:40px;min-height:40px}
+.tg-quiz-question-row .tg-options{gap:6px}
+.tg-quiz-question-row .tg-options>.tg-quiz-option{min-height:48px;padding:5px 7px;gap:5px}
+.tg-quiz-question-row .tg-option-letter{width:23px;height:23px;font-size:12px}
+.tg-quiz-question-row .tg-option-field{min-height:36px}
+.tg-quiz-question-row .tg-option-field>input:not([type=file]){height:34px;min-height:34px}
+.tg-quiz-question-row .tg-correct-mark{width:24px;height:24px;min-height:24px;font-size:17px}
+.tg-quiz-question-row>.tg-subtle{justify-self:center;min-height:32px;padding:4px 10px;border:0;background:transparent;color:#287ba8;font-size:14px}
+.tg-quiz-question-row>.tg-subtle:hover{background:#edf6fb}
+.tg-quiz-question-row .editor-row-actions{opacity:.82}
+.tg-quiz-question-row .editor-row-action{width:27px;height:27px;min-height:27px;color:#54758a}
+.tg-quiz-question-row .editor-row-action:disabled{opacity:.48}
+.tg-form>.tg-full>.tg-add{min-height:44px;padding:8px 13px}
+.tg-shell{padding-bottom:24px}
+@media(max-width:680px){.tg-page:has(.tg-shell){padding:10px}.tg-page:has(.tg-shell) .tg-header{margin:-10px -10px 10px;padding:8px 12px;border-width:0 0 1px;border-radius:0}.tg-shell>.editor-workflow{gap:6px;font-size:12px}.tg-form>.tg-full>h2{font-size:19px}.tg-quiz-question-row{gap:5px;padding:8px}.tg-quiz-question-row .tg-options{gap:5px}.tg-quiz-question-row .tg-options>.tg-quiz-option{padding:4px 5px}}

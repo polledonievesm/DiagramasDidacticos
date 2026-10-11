@@ -3,3 +3,23 @@
 @media(max-width:760px){.shared-settings{padding:15px}.shared-settings-grid,.shared-settings-groups{grid-template-columns:1fr}.activity-leaderboard{padding:14px}.activity-leaderboard li{grid-template-columns:36px minmax(0,1fr) auto;gap:8px}.activity-leaderboard li small{grid-column:2/-1}.leader-rank{width:30px;height:30px}}
 .shared-settings>summary{display:flex;align-items:center;justify-content:space-between;gap:14px;cursor:pointer;list-style:none}.shared-settings>summary::-webkit-details-marker{display:none}.shared-settings>summary::after{content:"＋";display:grid;place-items:center;flex:0 0 28px;width:28px;height:28px;border-radius:50%;background:#eaf2ec;color:#3c7957;font-size:18px;font-weight:800}.shared-settings[open]>summary::after{content:"−"}.shared-settings>summary strong{font-size:16px}.shared-settings>summary span{margin-left:auto;color:#64756b;font-size:12px;font-weight:600;text-align:right}.shared-settings-content{margin-top:14px}.shared-settings[open] .shared-settings-grid{margin-top:0}
 @media(max-width:760px){.shared-settings>summary{align-items:flex-start}.shared-settings>summary span{max-width:48%;font-size:11px}.shared-settings-content{margin-top:12px}}
+
+/* Usa el azul claro compartido por los paneles docente y alumno. */
+.shared-settings{border-color:#d8e7f0;background:#f5fafe;color:#24384a}
+.shared-settings-grid label{color:#405f75}
+.shared-settings input:not([type=checkbox]),.shared-settings select{border-color:#d2e2ec;color:#2a465b}
+.shared-settings fieldset{border-color:#d8e7f0;background:#fff}
+.shared-settings fieldset input[type=checkbox]{accent-color:#2184cf}
+.shared-settings>summary::after{background:#e2f1fa;color:#2479aa}
+.shared-settings>summary span,.shared-settings-note{color:#5f7586}
+.activity-cover-setting{border-color:#d8e7f0;background:#fff}
+.activity-cover-upload{border-color:#cbdfe9;background:#edf6fb;color:#286d92}
+.activity-draft-status{display:flex;align-items:center;gap:11px;margin:9px 0 2px;padding:10px 13px;border:1px solid #cfe1ec;border-radius:10px;background:#f2f9fd;color:#315d78}
+.activity-draft-status-icon{display:grid;place-items:center;flex:0 0 25px;width:25px;height:25px;border-radius:50%;background:#dceffa;color:#237dab;font-size:15px;font-weight:900}
+.activity-draft-status>div{display:grid;gap:1px;min-width:0}
+.activity-draft-status strong{font-size:12px;line-height:1.3}
+.activity-draft-status small{font-size:11px;line-height:1.4;color:#5e788b}
+.activity-draft-status.is-saving .activity-draft-status-icon{background:#dceffa;color:#267da8}
+.activity-draft-status.is-error{border-color:#e8c8c4;background:#fff7f6;color:#8e443e}
+.activity-draft-status.is-error .activity-draft-status-icon{background:#f9e5e2;color:#ae4942}
+@media(max-width:760px){.activity-draft-status{align-items:flex-start;margin:8px 0;padding:9px 10px}.activity-draft-status small{font-size:10px}}

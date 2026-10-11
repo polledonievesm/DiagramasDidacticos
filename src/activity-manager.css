@@ -148,6 +148,11 @@
 .am-account-menu>span{padding:4px 10px;color:#718594;font-size:11px;line-height:1.35}
 @media(max-width:1050px){.am-main-results{padding:22px 16px 44px}.am-results-layout{grid-template-columns:225px minmax(0,1fr);gap:12px}.am-results-workspace{padding:17px}.am-results-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.am-results-heading h1{font-size:27px}}
 @media(max-width:760px){.am-main-results{padding:14px 10px 34px}.am-results-layout{grid-template-columns:minmax(0,1fr)}.am-results-sidebar{position:static;max-height:none;padding:12px}.am-results-activity-list{grid-template-columns:repeat(2,minmax(0,1fr));max-height:210px;overflow:auto;padding-right:2px}.am-results-activity{padding:9px}.am-results-workspace{padding:14px}.am-results-heading{align-items:flex-start;flex-direction:column}.am-results-heading .am-refresh{width:auto}.am-results-tabs{overflow-x:auto;flex-wrap:nowrap}.am-report-tabs{flex-wrap:nowrap;overflow-x:auto}.am-report-tabs button{flex:0 0 auto}.am-account>button small{max-width:135px}}
+
+/* Fija la navegación de Mis actividades y Mis resultados, reservando su espacio. */
+.activity-manager-page{padding-top:70px}
+.activity-manager-page>.am-header{position:fixed;inset:0 0 auto;z-index:1000;width:100%;height:70px}
+@media(max-width:760px){.activity-manager-page{padding-top:104px}.activity-manager-page>.am-header{height:auto;min-height:60px}}
 @media(max-width:440px){.am-results-summary>div{padding:10px}.am-results-summary>div strong{font-size:17px}.am-results-activity-list{grid-template-columns:1fr}.am-results-heading h1{font-size:25px}}
 
 /* Keep the teacher workspace in the same calm blue palette as the game and student portal. */

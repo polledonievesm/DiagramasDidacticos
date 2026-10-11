@@ -223,3 +223,8 @@
 .teacher-page .account-section .roster-import{border-color:#d8e7f0;background:#f5fafe}
 .teacher-page .account-section .roster-import>summary{color:#267da9}
 .teacher-page .account-section .roster-toolbar input,.teacher-page .account-section .roster-toolbar select{border-color:#d4e2eb;color:#31536b}
+
+/* Mantiene la navegación docente visible mientras se desplaza cualquier sección. */
+.teacher-topbar{position:fixed!important;inset:0 0 auto!important;width:100%;z-index:1000!important}
+.teacher-topbar-spacer{height:72px;flex:0 0 72px}
+@media(max-width:780px){.teacher-topbar-spacer{height:104px;flex-basis:104px}}
